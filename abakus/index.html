@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Abakus — Tu plata bajo control, sin Excel y sin apps</title>
+<meta name="description" content="Lleva tus finanzas como freelancer desde WhatsApp. Registra ingresos, gastos y cobros sin abrir apps ni planillas. Lanzamiento Junio 2026.">
+
+<!-- Open Graph -->
+<meta property="og:title" content="Abakus — Tu plata bajo control desde WhatsApp">
+<meta property="og:description" content="Lleva tu contabilidad sin Excel ni apps. Solo escribís, Abakus organiza.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://heimdallbridge.com/abakus">
+
+<!-- Fonts: Plus Jakarta Sans + Caveat para toques manuscritos -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Caveat:wght@400;700&display=swap" rel="stylesheet">
+
+<!-- Tailwind CSS via CDN -->
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          teal: '#2DD4BF',
+          coral: '#F87171',
+          purple: '#A855F7',
+          amber: '#FBBF24',
+          navy: '#1E3A5F',
+          cream: '#FAF8F4',
+          ink: '#1F2937',
+        },
+        fontFamily: {
+          display: ['Plus Jakarta Sans', 'sans-serif'],
+          handwritten: ['Caveat', 'cursive'],
+        }
+      }
+    }
+  }
+</script>
+
+<style>
+  body {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    background: #FAF8F4;
+    color: #1F2937;
+  }
+
+  /* Animated abacus beads */
+  @keyframes float-slow {
+    0%, 100% { transform: translateY(0) rotate(0deg); }
+    50% { transform: translateY(-12px) rotate(5deg); }
+  }
+  @keyframes float-medium {
+    0%, 100% { transform: translateY(0) rotate(0deg); }
+    50% { transform: translateY(-8px) rotate(-3deg); }
+  }
+  .float-slow { animation: float-slow 4s ease-in-out infinite; }
+  .float-medium { animation: float-medium 3s ease-in-out infinite; }
+  .float-delayed { animation-delay: 1.5s; }
+
+  /* Confetti grain texture */
+  .grain {
+    position: relative;
+  }
+  .grain::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: radial-gradient(circle at 20% 30%, rgba(45, 212, 191, 0.08) 0%, transparent 50%),
+                      radial-gradient(circle at 80% 70%, rgba(248, 113, 113, 0.08) 0%, transparent 50%);
+    pointer-events: none;
+  }
+
+  /* Phone mockup */
+  .phone-frame {
+    background: #1F2937;
+    border-radius: 40px;
+    padding: 12px;
+    box-shadow: 0 30px 60px -20px rgba(30, 58, 95, 0.4),
+                0 0 0 1px rgba(255,255,255,0.1) inset;
+  }
+
+  .chat-bubble-them {
+    background: white;
+    border-radius: 18px 18px 18px 4px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  }
+  .chat-bubble-me {
+    background: #DCF8C6;
+    border-radius: 18px 18px 4px 18px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  }
+
+  /* Sticker effect */
+  .sticker {
+    transform: rotate(-3deg);
+    box-shadow: 6px 6px 0 #1E3A5F;
+    transition: transform 0.3s ease;
+  }
+  .sticker:hover { transform: rotate(-1deg) scale(1.02); }
+
+  /* CTA hover */
+  .cta-button {
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 0 #1E3A5F;
+  }
+  .cta-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 0 #1E3A5F;
+  }
+  .cta-button:active {
+    transform: translateY(2px);
+    box-shadow: 0 2px 0 #1E3A5F;
+  }
+
+  /* Dotted divider */
+  .dotted-line {
+    background-image: linear-gradient(90deg, #1E3A5F 50%, transparent 50%);
+    background-size: 16px 2px;
+    height: 2px;
+  }
+
+  /* Scroll fade in */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(24px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .fade-in {
+    animation: fadeUp 0.8s ease-out forwards;
+  }
+
+  /* Hide scroll on body when modal open */
+  body.modal-open { overflow: hidden; }
+</style>
+</head>
+
+<body class="overflow-x-hidden">
+
+<!-- ===== NAVBAR ===== -->
+<nav class="fixed top-0 left-0 right-0 z-40 bg-cream/80 backdrop-blur-md border-b border-ink/5">
+  <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+    <div class="flex items-center gap-2">
+      <!-- Logo SVG inline (simplificado) -->
+      <div class="w-9 h-9 flex items-center justify-center">
+        <svg viewBox="0 0 100 100" class="w-full h-full">
+          <path d="M 25 80 L 50 20 L 75 80" stroke="#2DD4BF" stroke-width="8" fill="none" stroke-linecap="round"/>
+          <path d="M 50 20 L 75 80" stroke="#F87171" stroke-width="8" fill="none" stroke-linecap="round"/>
+          <line x1="32" y1="80" x2="68" y2="80" stroke="#1E3A5F" stroke-width="6" stroke-linecap="round"/>
+          <circle cx="48" cy="55" r="4" fill="#FBBF24"/>
+          <circle cx="56" cy="55" r="4" fill="#FBBF24"/>
+          <circle cx="48" cy="65" r="4" fill="#2DD4BF"/>
+          <circle cx="56" cy="65" r="4" fill="#2DD4BF"/>
+          <circle cx="48" cy="75" r="4" fill="#A855F7"/>
+          <circle cx="56" cy="75" r="4" fill="#A855F7"/>
+        </svg>
+      </div>
+      <span class="text-2xl font-extrabold text-navy tracking-tight">Abakus</span>
+    </div>
+    <a href="#waitlist" class="hidden sm:inline-flex items-center gap-2 bg-navy text-cream px-5 py-2.5 rounded-full text-sm font-semibold hover:bg-ink transition">
+      Únete a la lista
+      <span>→</span>
+    </a>
+  </div>
+</nav>
+
+<!-- ===== HERO ===== -->
+<section class="relative pt-32 pb-20 px-6 grain overflow-hidden">
+
+  <!-- Decorative floating beads -->
+  <div class="absolute top-32 left-10 w-12 h-12 rounded-full bg-amber float-slow opacity-80 hidden md:block"></div>
+  <div class="absolute top-48 right-20 w-8 h-8 rounded-full bg-teal float-medium float-delayed opacity-70 hidden md:block"></div>
+  <div class="absolute bottom-32 left-1/4 w-10 h-10 rounded-full bg-purple float-slow opacity-60 hidden md:block"></div>
+  <div class="absolute bottom-40 right-10 w-14 h-14 rounded-full bg-coral float-medium opacity-75 hidden md:block"></div>
+
+  <div class="max-w-6xl mx-auto grid lg:grid-cols-2 gap-12 items-center relative z-10">
+
+    <!-- Left: Headline -->
+    <div class="fade-in">
+      <div class="inline-flex items-center gap-2 bg-amber/30 border border-amber px-4 py-1.5 rounded-full mb-6">
+        <span class="w-2 h-2 rounded-full bg-coral animate-pulse"></span>
+        <span class="text-sm font-semibold text-navy">Lanzamiento Junio 2026 · Chile</span>
+      </div>
+
+      <h1 class="text-5xl md:text-6xl lg:text-7xl font-extrabold leading-[1.05] text-navy tracking-tight">
+        Tu plata,
+        <span class="relative inline-block">
+          <span class="relative z-10">bajo control</span>
+          <svg class="absolute -bottom-2 left-0 w-full" viewBox="0 0 200 12" preserveAspectRatio="none">
+            <path d="M0 8 Q50 0 100 6 T200 8" stroke="#FBBF24" stroke-width="6" fill="none" stroke-linecap="round"/>
+          </svg>
+        </span>
+        <br>desde
+        <span class="text-teal">WhatsApp</span>.
+      </h1>
+
+      <p class="text-xl text-ink/80 mt-8 max-w-xl leading-relaxed">
+        Sin apps que descargar. Sin Excel que llenar. Solo escribes "vendí $50.000" y Abakus organiza tus finanzas como freelancer. Como hablar con tu contadora favorita, pero por chat. ✨
+      </p>
+
+      <div class="mt-10 flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+        <a href="#waitlist" class="cta-button inline-flex items-center gap-3 bg-coral text-white px-8 py-4 rounded-2xl font-bold text-lg">
+          Quiero ser de los primeros
+          <span class="text-2xl">→</span>
+        </a>
+        <p class="text-sm text-ink/60 font-handwritten text-xl">
+          ↓ Te avisamos antes que a nadie
+        </p>
+      </div>
+
+      <!-- Social proof / trust -->
+      <div class="mt-12 flex items-center gap-6 text-sm text-ink/60">
+        <div class="flex -space-x-2">
+          <div class="w-10 h-10 rounded-full bg-teal border-2 border-cream flex items-center justify-center text-white font-bold">M</div>
+          <div class="w-10 h-10 rounded-full bg-coral border-2 border-cream flex items-center justify-center text-white font-bold">J</div>
+          <div class="w-10 h-10 rounded-full bg-purple border-2 border-cream flex items-center justify-center text-white font-bold">A</div>
+          <div class="w-10 h-10 rounded-full bg-amber border-2 border-cream flex items-center justify-center text-navy font-bold">+</div>
+        </div>
+        <p>Hecho en Chile 🇨🇱 para freelancers de toda LATAM</p>
+      </div>
+    </div>
+
+    <!-- Right: Phone mockup -->
+    <div class="relative max-w-sm mx-auto lg:max-w-none fade-in">
+      <div class="phone-frame relative max-w-xs mx-auto">
+        <div class="bg-[#E5DDD5] rounded-3xl overflow-hidden">
+          <!-- WhatsApp header -->
+          <div class="bg-teal text-white p-4 flex items-center gap-3">
+            <div class="w-10 h-10 rounded-full bg-cream flex items-center justify-center">
+              <svg viewBox="0 0 100 100" class="w-7 h-7">
+                <path d="M 25 80 L 50 20 L 75 80" stroke="#2DD4BF" stroke-width="10" fill="none" stroke-linecap="round"/>
+                <path d="M 50 20 L 75 80" stroke="#F87171" stroke-width="10" fill="none" stroke-linecap="round"/>
+                <line x1="32" y1="80" x2="68" y2="80" stroke="#1E3A5F" stroke-width="8" stroke-linecap="round"/>
+                <circle cx="48" cy="62" r="4" fill="#FBBF24"/>
+                <circle cx="56" cy="62" r="4" fill="#FBBF24"/>
+              </svg>
+            </div>
+            <div>
+              <p class="font-bold leading-tight">Abakus</p>
+              <p class="text-xs opacity-90">en línea</p>
+            </div>
+          </div>
+
+          <!-- Chat -->
+          <div class="p-4 space-y-3 min-h-[400px]">
+            <div class="chat-bubble-me ml-auto max-w-[80%] p-3">
+              <p class="text-sm">vendi 80 lucas hoy 🤑</p>
+              <p class="text-[10px] text-ink/40 text-right mt-1">14:23 ✓✓</p>
+            </div>
+
+            <div class="chat-bubble-them mr-auto max-w-[85%] p-3">
+              <p class="text-sm">¡Listo! Anoté <strong>$80.000</strong> como ingreso de hoy 💰</p>
+              <p class="text-sm mt-2">Llevas <strong>$340.000</strong> este mes. ¿Es de algún cliente puntual?</p>
+              <p class="text-[10px] text-ink/40 text-right mt-1">14:23</p>
+            </div>
+
+            <div class="chat-bubble-me ml-auto max-w-[80%] p-3">
+              <p class="text-sm">si, javier de la página web</p>
+              <p class="text-[10px] text-ink/40 text-right mt-1">14:24 ✓✓</p>
+            </div>
+
+            <div class="chat-bubble-them mr-auto max-w-[85%] p-3">
+              <p class="text-sm">Anotado en la cuenta de Javier ✨</p>
+              <p class="text-sm mt-2">Aún quedan <strong>$120.000</strong> pendientes de él. Te aviso si lleva mucho sin pagarte 👀</p>
+              <p class="text-[10px] text-ink/40 text-right mt-1">14:24</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sticker decoration -->
+      <div class="sticker absolute -top-6 -right-4 bg-amber px-4 py-2 rounded-2xl border-2 border-navy hidden md:block">
+        <p class="font-handwritten text-2xl text-navy">¡así de fácil!</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== DOLOR / PROBLEMA ===== -->
+<section class="py-24 px-6 bg-navy text-cream relative overflow-hidden">
+  <div class="absolute top-0 left-0 right-0 h-px dotted-line opacity-20"></div>
+
+  <div class="max-w-4xl mx-auto text-center">
+    <p class="font-handwritten text-3xl text-amber mb-4">¿te suena familiar?</p>
+    <h2 class="text-4xl md:text-5xl font-extrabold leading-tight mb-12">
+      Llevar la plata como freelancer<br>
+      <span class="text-coral">no debería ser un infierno.</span>
+    </h2>
+
+    <div class="grid md:grid-cols-3 gap-8 text-left">
+      <div class="bg-white/5 backdrop-blur p-6 rounded-2xl border border-white/10">
+        <div class="text-4xl mb-3">😩</div>
+        <h3 class="font-bold text-lg mb-2">"Lo apunto después"</h3>
+        <p class="text-cream/70 text-sm">Pasaron 3 meses y no sabes cuánto ganaste. Ni cuánto te deben.</p>
+      </div>
+      <div class="bg-white/5 backdrop-blur p-6 rounded-2xl border border-white/10">
+        <div class="text-4xl mb-3">📊</div>
+        <h3 class="font-bold text-lg mb-2">Excel del demonio</h3>
+        <p class="text-cream/70 text-sm">Empezaste con buenas intenciones. La última fila tiene fecha de hace 6 meses.</p>
+      </div>
+      <div class="bg-white/5 backdrop-blur p-6 rounded-2xl border border-white/10">
+        <div class="text-4xl mb-3">🥲</div>
+        <h3 class="font-bold text-lg mb-2">"¿Me pagaron ya?"</h3>
+        <p class="text-cream/70 text-sm">Cobrar es la peor parte. Recordar a quién le toca pagar, peor aún.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SOLUCIÓN / FEATURES ===== -->
+<section class="py-24 px-6 grain">
+  <div class="max-w-6xl mx-auto">
+
+    <div class="text-center mb-16">
+      <p class="font-handwritten text-3xl text-coral mb-3">la solución</p>
+      <h2 class="text-4xl md:text-5xl font-extrabold text-navy leading-tight">
+        Habla con Abakus<br>
+        <span class="text-teal">como con cualquier amigo.</span>
+      </h2>
+    </div>
+
+    <div class="grid md:grid-cols-2 gap-8">
+
+      <!-- Feature 1 -->
+      <div class="bg-white border-2 border-navy/10 rounded-3xl p-8 hover:border-teal transition">
+        <div class="w-14 h-14 rounded-2xl bg-teal/20 flex items-center justify-center text-3xl mb-4">💬</div>
+        <h3 class="font-bold text-2xl text-navy mb-3">Solo escribes lo que pasó</h3>
+        <p class="text-ink/70 mb-4">"Pagué $20.000 al diseño", "Cobré la página de Pedro", "Gasté 5 lucas en Uber". Abakus entiende y lo guarda donde corresponde, sin formularios.</p>
+        <div class="bg-cream rounded-xl p-3 border border-ink/10">
+          <p class="text-sm text-ink/60 italic">"Compré $35k en insumos para el cliente Tomás"</p>
+          <p class="text-sm text-teal font-semibold mt-1">→ Anotado como gasto del proyecto Tomás</p>
+        </div>
+      </div>
+
+      <!-- Feature 2 -->
+      <div class="bg-white border-2 border-navy/10 rounded-3xl p-8 hover:border-coral transition">
+        <div class="w-14 h-14 rounded-2xl bg-coral/20 flex items-center justify-center text-3xl mb-4">⏰</div>
+        <h3 class="font-bold text-2xl text-navy mb-3">No olvidas a quién le toca pagar</h3>
+        <p class="text-ink/70 mb-4">Abakus te avisa cuando un pago lleva días sin entrar. Tú decides cuándo llamar a tu cliente, sin que se te quede plata afuera.</p>
+        <div class="bg-cream rounded-xl p-3 border border-ink/10">
+          <p class="text-sm text-coral font-semibold">⏰ Hace 5 días</p>
+          <p class="text-sm text-ink/70 mt-1">"Carolina aún debe $80.000 del logo. ¿Te recuerdo de nuevo en 3 días?"</p>
+        </div>
+      </div>
+
+      <!-- Feature 3 -->
+      <div class="bg-white border-2 border-navy/10 rounded-3xl p-8 hover:border-purple transition">
+        <div class="w-14 h-14 rounded-2xl bg-purple/20 flex items-center justify-center text-3xl mb-4">📊</div>
+        <h3 class="font-bold text-2xl text-navy mb-3">Resúmenes claros, sin números raros</h3>
+        <p class="text-ink/70 mb-4">"¿Cómo me fue este mes?" Abakus te responde en el chat. Sin gráficos imposibles, sin lenguaje de contador. Si lo necesitas para tu contadora, lo exportas a PDF o Excel.</p>
+        <div class="bg-cream rounded-xl p-3 border border-ink/10">
+          <p class="text-sm text-ink/70">Este mes: <strong class="text-purple">$1.240.000</strong> en ingresos · <strong class="text-coral">$340.000</strong> en gastos · <strong class="text-teal">$900.000</strong> netos 🎉</p>
+        </div>
+      </div>
+
+      <!-- Feature 4 -->
+      <div class="bg-white border-2 border-navy/10 rounded-3xl p-8 hover:border-amber transition">
+        <div class="w-14 h-14 rounded-2xl bg-amber/30 flex items-center justify-center text-3xl mb-4">🔒</div>
+        <h3 class="font-bold text-2xl text-navy mb-3">Tu plata, tus datos</h3>
+        <p class="text-ink/70 mb-4">No conectamos cuentas bancarias. No pedimos contraseñas. Solo lo que tú escribes, encriptado y privado. Punto.</p>
+        <div class="bg-cream rounded-xl p-3 border border-ink/10">
+          <p class="text-sm text-ink/70">Sin clave del banco · Sin RUT · Sin datos sensibles 🔐</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ===== CÓMO FUNCIONA ===== -->
+<section class="py-24 px-6 bg-amber/20">
+  <div class="max-w-5xl mx-auto">
+    <div class="text-center mb-16">
+      <p class="font-handwritten text-3xl text-purple mb-3">simple, en serio</p>
+      <h2 class="text-4xl md:text-5xl font-extrabold text-navy">
+        Tres pasos. Cero complicación.
+      </h2>
+    </div>
+
+    <div class="grid md:grid-cols-3 gap-8 relative">
+      <!-- Connector line (desktop only) -->
+      <div class="hidden md:block absolute top-12 left-[16%] right-[16%] h-1 dotted-line"></div>
+
+      <div class="text-center relative">
+        <div class="w-24 h-24 mx-auto bg-teal rounded-full flex items-center justify-center text-cream text-4xl font-extrabold mb-6 relative z-10 border-4 border-cream">1</div>
+        <h3 class="font-bold text-xl text-navy mb-2">Te unes a la lista</h3>
+        <p class="text-ink/70">Te enviamos el acceso apenas Abakus esté listo en junio.</p>
+      </div>
+
+      <div class="text-center relative">
+        <div class="w-24 h-24 mx-auto bg-coral rounded-full flex items-center justify-center text-cream text-4xl font-extrabold mb-6 relative z-10 border-4 border-cream">2</div>
+        <h3 class="font-bold text-xl text-navy mb-2">Guardas el contacto</h3>
+        <p class="text-ink/70">Mismo WhatsApp que ya usas. Sin descargar apps ni instalar nada.</p>
+      </div>
+
+      <div class="text-center relative">
+        <div class="w-24 h-24 mx-auto bg-purple rounded-full flex items-center justify-center text-cream text-4xl font-extrabold mb-6 relative z-10 border-4 border-cream">3</div>
+        <h3 class="font-bold text-xl text-navy mb-2">Empiezas a chatear</h3>
+        <p class="text-ink/70">Cuéntale lo que ganaste, gastaste o te deben. El resto es de Abakus.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== ¿PARA QUIÉN ES? ===== -->
+<section class="py-24 px-6">
+  <div class="max-w-5xl mx-auto">
+    <div class="text-center mb-16">
+      <p class="font-handwritten text-3xl text-teal mb-3">¿es para ti?</p>
+      <h2 class="text-4xl md:text-5xl font-extrabold text-navy">
+        Si trabajas independiente,<br>
+        <span class="text-coral">probablemente sí.</span>
+      </h2>
+    </div>
+
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div class="bg-teal/10 border-2 border-teal/30 rounded-2xl p-6 text-center">
+        <div class="text-4xl mb-2">🎨</div>
+        <p class="font-semibold text-navy">Diseñadores</p>
+      </div>
+      <div class="bg-coral/10 border-2 border-coral/30 rounded-2xl p-6 text-center">
+        <div class="text-4xl mb-2">💻</div>
+        <p class="font-semibold text-navy">Devs freelance</p>
+      </div>
+      <div class="bg-purple/10 border-2 border-purple/30 rounded-2xl p-6 text-center">
+        <div class="text-4xl mb-2">📸</div>
+        <p class="font-semibold text-navy">Fotógrafos</p>
+      </div>
+      <div class="bg-amber/20 border-2 border-amber rounded-2xl p-6 text-center">
+        <div class="text-4xl mb-2">✍️</div>
+        <p class="font-semibold text-navy">Consultores</p>
+      </div>
+      <div class="bg-coral/10 border-2 border-coral/30 rounded-2xl p-6 text-center">
+        <div class="text-4xl mb-2">💅</div>
+        <p class="font-semibold text-navy">Emprendedoras</p>
+      </div>
+      <div class="bg-purple/10 border-2 border-purple/30 rounded-2xl p-6 text-center">
+        <div class="text-4xl mb-2">🍰</div>
+        <p class="font-semibold text-navy">Reposteras</p>
+      </div>
+      <div class="bg-teal/10 border-2 border-teal/30 rounded-2xl p-6 text-center">
+        <div class="text-4xl mb-2">🛍️</div>
+        <p class="font-semibold text-navy">Vendedoras</p>
+      </div>
+      <div class="bg-amber/20 border-2 border-amber rounded-2xl p-6 text-center">
+        <div class="text-4xl mb-2">+</div>
+        <p class="font-semibold text-navy">Tú también</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== WAITLIST CTA ===== -->
+<section id="waitlist" class="py-24 px-6 bg-navy text-cream relative overflow-hidden">
+  <!-- Decorative beads -->
+  <div class="absolute top-10 left-10 w-20 h-20 rounded-full bg-amber/30 blur-xl"></div>
+  <div class="absolute bottom-10 right-10 w-32 h-32 rounded-full bg-coral/30 blur-2xl"></div>
+  <div class="absolute top-1/2 right-1/4 w-16 h-16 rounded-full bg-teal/30 blur-xl"></div>
+
+  <div class="max-w-2xl mx-auto text-center relative z-10">
+    <p class="font-handwritten text-3xl text-amber mb-3">no te quedes afuera</p>
+    <h2 class="text-4xl md:text-5xl font-extrabold mb-6 leading-tight">
+      Sé de los primeros<br>en probar Abakus.
+    </h2>
+    <p class="text-cream/80 text-lg mb-10">
+      Lanzamos en <strong>junio 2026</strong>. Los primeros 100 freelancers reciben <strong class="text-amber">3 meses gratis</strong> del plan Pro.
+    </p>
+
+    <form id="waitlist-form" class="flex flex-col sm:flex-row gap-3 max-w-lg mx-auto" onsubmit="handleSubmit(event)">
+      <input
+        type="email"
+        required
+        placeholder="tu@email.com"
+        class="flex-1 px-6 py-4 rounded-2xl bg-cream text-ink placeholder-ink/40 font-medium focus:outline-none focus:ring-4 focus:ring-amber/50"
+      >
+      <button type="submit" class="cta-button bg-coral text-white px-8 py-4 rounded-2xl font-bold whitespace-nowrap">
+        Me apunto →
+      </button>
+    </form>
+
+    <p class="text-cream/50 text-sm mt-4">
+      Sin spam. Solo te avisamos del lanzamiento. 🤝
+    </p>
+
+    <!-- Success state (oculto por defecto) -->
+    <div id="success-message" class="hidden mt-8 bg-teal/20 border-2 border-teal rounded-2xl p-6 max-w-lg mx-auto">
+      <p class="text-2xl font-bold mb-2">¡Estás dentro! 🎉</p>
+      <p class="text-cream/80">Te avisaremos apenas Abakus esté listo. Mientras, síguenos en redes para no perderte nada.</p>
+      <div class="flex justify-center gap-4 mt-4">
+        <a href="https://instagram.com/heyabakus" target="_blank" class="text-amber hover:text-coral transition">@heyabakus en Instagram</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== FAQ ===== -->
+<section class="py-24 px-6">
+  <div class="max-w-3xl mx-auto">
+    <h2 class="text-4xl md:text-5xl font-extrabold text-navy text-center mb-12">
+      Preguntas que <span class="text-purple">todo el mundo hace</span>
+    </h2>
+
+    <div class="space-y-4">
+      <details class="bg-white border-2 border-navy/10 rounded-2xl p-6 group">
+        <summary class="font-bold text-navy cursor-pointer flex justify-between items-center">
+          ¿Es gratis?
+          <span class="text-2xl group-open:rotate-45 transition-transform">+</span>
+        </summary>
+        <p class="text-ink/70 mt-4">Sí, hay un plan gratis para siempre con hasta 30 movimientos al mes. El plan Pro ($7.990 CLP/mes) desbloquea movimientos ilimitados, cuentas por cobrar ilimitadas, exportación a PDF/Excel y soporte prioritario.</p>
+      </details>
+
+      <details class="bg-white border-2 border-navy/10 rounded-2xl p-6 group">
+        <summary class="font-bold text-navy cursor-pointer flex justify-between items-center">
+          ¿Necesito instalar algo?
+          <span class="text-2xl group-open:rotate-45 transition-transform">+</span>
+        </summary>
+        <p class="text-ink/70 mt-4">No. Abakus funciona dentro del WhatsApp que ya usas. Solo guardas un contacto y le hablas como a cualquier persona.</p>
+      </details>
+
+      <details class="bg-white border-2 border-navy/10 rounded-2xl p-6 group">
+        <summary class="font-bold text-navy cursor-pointer flex justify-between items-center">
+          ¿Mis datos están seguros?
+          <span class="text-2xl group-open:rotate-45 transition-transform">+</span>
+        </summary>
+        <p class="text-ink/70 mt-4">Totalmente. No conectamos tu cuenta bancaria, no pedimos contraseñas, no compartimos tus datos con terceros. Toda la información está encriptada. Tú escribes, nosotros guardamos. Punto.</p>
+      </details>
+
+      <details class="bg-white border-2 border-navy/10 rounded-2xl p-6 group">
+        <summary class="font-bold text-navy cursor-pointer flex justify-between items-center">
+          ¿Sirve para emitir boletas o facturas?
+          <span class="text-2xl group-open:rotate-45 transition-transform">+</span>
+        </summary>
+        <p class="text-ink/70 mt-4">Por ahora no, pero estamos trabajando en <strong>Factum</strong>, otro asistente del ecosistema Heimdall. Abakus se enfoca en llevar tu plata: ingresos, gastos y cuentas por cobrar.</p>
+      </details>
+
+      <details class="bg-white border-2 border-navy/10 rounded-2xl p-6 group">
+        <summary class="font-bold text-navy cursor-pointer flex justify-between items-center">
+          ¿Funciona fuera de Chile?
+          <span class="text-2xl group-open:rotate-45 transition-transform">+</span>
+        </summary>
+        <p class="text-ink/70 mt-4">El lanzamiento es en Chile, pero ya estamos preparando soporte para otros países de LATAM. Si te apuntas a la lista desde otro país, te avisamos primero cuando esté disponible para ti.</p>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- ===== FOOTER ===== -->
+<footer class="bg-ink text-cream py-12 px-6">
+  <div class="max-w-6xl mx-auto">
+    <div class="grid md:grid-cols-3 gap-8 mb-8">
+      <div>
+        <div class="flex items-center gap-2 mb-3">
+          <svg viewBox="0 0 100 100" class="w-8 h-8">
+            <path d="M 25 80 L 50 20 L 75 80" stroke="#2DD4BF" stroke-width="8" fill="none" stroke-linecap="round"/>
+            <path d="M 50 20 L 75 80" stroke="#F87171" stroke-width="8" fill="none" stroke-linecap="round"/>
+            <line x1="32" y1="80" x2="68" y2="80" stroke="#FAF8F4" stroke-width="6" stroke-linecap="round"/>
+            <circle cx="48" cy="55" r="4" fill="#FBBF24"/>
+            <circle cx="56" cy="55" r="4" fill="#FBBF24"/>
+          </svg>
+          <span class="text-xl font-extrabold">Abakus</span>
+        </div>
+        <p class="text-cream/60 text-sm">Tu plata bajo control desde WhatsApp. Hecho con cariño en Chile 🇨🇱</p>
+      </div>
+      <div>
+        <h4 class="font-bold mb-3">Ecosistema Heimdall</h4>
+        <ul class="space-y-2 text-cream/60 text-sm">
+          <li>Abakus — Finanzas freelance ✨</li>
+          <li>Quanta — Ventas (próximamente)</li>
+          <li>Factum — Facturación (próximamente)</li>
+        </ul>
+      </div>
+      <div>
+        <h4 class="font-bold mb-3">Síguenos</h4>
+        <ul class="space-y-2 text-cream/60 text-sm">
+          <li><a href="https://instagram.com/heyabakus" target="_blank" class="hover:text-amber transition">Instagram @heyabakus</a></li>
+          <li><a href="https://tiktok.com/@heyabakus" target="_blank" class="hover:text-amber transition">TikTok @heyabakus</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="border-t border-cream/10 pt-6 flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-cream/60">
+      <p>© 2026 Heimdall Bridge. Todos los derechos reservados.</p>
+      <div class="flex gap-6">
+        <a href="https://app.termly.io/document/privacy-policy/e5904f73-29ba-441f-b1d0-8673faf2d372" target="_blank" class="hover:text-amber transition">Política de Privacidad</a>
+        <a href="mailto:hola@heimdallbridge.com" class="hover:text-amber transition">Contacto</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script>
+  function handleSubmit(e) {
+    e.preventDefault();
+    const form = document.getElementById('waitlist-form');
+    const successMsg = document.getElementById('success-message');
+
+    // TODO: Conectar con tu backend / Mailchimp / ConvertKit / Supabase
+    // Por ahora solo muestra el mensaje de éxito
+
+    form.classList.add('hidden');
+    successMsg.classList.remove('hidden');
+
+    // Aquí iría tu integración real:
+    // const email = e.target[0].value;
+    // fetch('/api/waitlist', { method: 'POST', body: JSON.stringify({ email }) })
+  }
+</script>
+
+</body>
+</html>
