@@ -1,8 +1,9 @@
 import { Usuario } from '../types';
 import { getCuentasPendientes, getResumenMes } from '../supabase/queries';
 import { clp } from '../utils/format';
+import { config } from '../config';
 
-export type ComandoEspecial = 'resumen' | 'cobros' | 'ayuda';
+export type ComandoEspecial = 'resumen' | 'cobros' | 'ayuda' | 'pago';
 
 /**
  * Detecta comandos especiales que NO pasan por Claude (ahorra tokens y latencia).
@@ -12,6 +13,17 @@ export function detectarComando(texto: string): ComandoEspecial | null {
   if (t === 'resumen' || t === 'saldo') return 'resumen';
   if (t === 'cobros' || t === 'pendientes') return 'cobros';
   if (t === 'ayuda' || t === 'help' || t === 'menu' || t === 'menú') return 'ayuda';
+  if (
+    t === 'pagar' ||
+    t === 'suscribirme' ||
+    t === 'suscribir' ||
+    t === 'suscripción' ||
+    t === 'suscripcion' ||
+    t === 'plan' ||
+    t === 'premium'
+  ) {
+    return 'pago';
+  }
   return null;
 }
 
@@ -21,12 +33,25 @@ const AYUDA = `🧮 *Abakus* — esto es lo que puedo hacer:
 • *resumen* o *saldo* → ingresos vs egresos del mes.
 • *cobros* o *pendientes* → tus cuentas por cobrar.
 • Cuéntame una deuda: "Juan me debe 30000 para el 30/06".
+• *plan* o *suscribirme* → activa tu suscripción.
 
 ¿En qué te ayudo?`;
 
 export async function handleComando(user: Usuario, comando: ComandoEspecial): Promise<string> {
   if (comando === 'ayuda') {
     return AYUDA;
+  }
+
+  if (comando === 'pago') {
+    if (!config.pago.mercadopagoLink) {
+      return '🚧 La suscripción estará disponible muy pronto. ¡Te avisaré apenas se active! 🙌';
+    }
+    return `💳 *Activa tu plan Abakus*
+
+Suscríbete de forma segura con Mercado Pago aquí:
+${config.pago.mercadopagoLink}
+
+Una vez completado el pago, tu cuenta queda activa al instante. ¡Gracias por confiar en Abakus! 🧮`;
   }
 
   if (comando === 'resumen') {

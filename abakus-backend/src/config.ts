@@ -27,4 +27,8 @@ export const config = {
     url: required('SUPABASE_URL'),
     serviceKey: required('SUPABASE_SERVICE_KEY'),
   },
+  pago: {
+    // Link de suscripción de Mercado Pago. Vacío hasta que se configure en Railway.
+    mercadopagoLink: process.env.MERCADOPAGO_LINK ?? '',
+  },
 } as const;
