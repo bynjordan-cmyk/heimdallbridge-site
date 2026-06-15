@@ -32,6 +32,15 @@ export async function updateUsuario(
   if (error) throw error;
 }
 
+/** Guarda o actualiza la meta mensual de ingresos del usuario. */
+export async function setMeta(phone: string, monto: number): Promise<void> {
+  const { error } = await supabase
+    .from('usuarios')
+    .update({ meta_mensual: monto })
+    .eq('phone', phone);
+  if (error) throw error;
+}
+
 /** Actualiza el plan del usuario. */
 export async function setPlan(phone: string, plan: 'basico' | 'pro' | 'gratis'): Promise<void> {
   const { error } = await supabase

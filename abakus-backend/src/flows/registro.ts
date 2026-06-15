@@ -61,7 +61,8 @@ export async function handleRegistro(
       .join(' | ');
 
     if (interp.tipo === 'ingreso') {
-      return `✅ Ingreso registrado\n💰 ${detalle}`;
+      const tip = tipIngreso(interp.monto);
+      return `✅ Ingreso registrado\n💰 ${detalle}${tip}`;
     }
 
     // Egreso: calcular balance del mes y alertar si es negativo
@@ -99,4 +100,16 @@ export async function handleRegistro(
   return `📋 Cuenta por cobrar registrada\n👤 ${
     interp.contraparte ?? 'Sin contraparte'
   } | ${clp(interp.monto)}${vence}`;
+}
+
+const TIPS_IVA = [
+  '💡 _Tip: Recuerda apartar ~10% para retención de honorarios (SII)._',
+  '💡 _Tip: ¿Ya tienes apartado para el IVA de este mes? Un 19% sobre tus ingresos afectos te ayuda a no sorprenderte._',
+  '💡 _Tip: Con buenos ingresos, considera guardar al menos un 10-15% en una cuenta separada para obligaciones tributarias._',
+];
+
+function tipIngreso(monto: number): string {
+  if (monto < 300_000) return '';
+  const tip = TIPS_IVA[Math.floor(Math.random() * TIPS_IVA.length)];
+  return `\n\n${tip}`;
 }

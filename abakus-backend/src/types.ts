@@ -12,6 +12,7 @@ export interface Usuario {
   trial_ends_at: string | null;
   email: string | null;
   estado_conversacion: string | null;
+  meta_mensual: number | null;
   created_at: string;
 }
 
