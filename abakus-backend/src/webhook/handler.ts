@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { MensajeEntrante, WhatsAppWebhookBody } from '../types';
 import { yaProcesado } from '../utils/idempotency';
 import { getUsuarioByPhone } from '../supabase/queries';
-import { interpretar } from '../openai/interpreter';
+import { interpretar } from '../claude/interpreter';
 import { sendText } from '../whatsapp/sender';
 import { handleOnboarding } from '../flows/onboarding';
 import { handleRegistro } from '../flows/registro';
@@ -70,7 +70,7 @@ async function procesar(mensaje: MensajeEntrante): Promise<void> {
     return;
   }
 
-  // Comandos especiales: no pasan por OpenAI.
+  // Comandos especiales: no pasan por Claude.
   const comando = detectarComando(mensaje.texto);
   if (comando) {
     const respuesta = await handleComando(usuario, comando);
@@ -78,7 +78,7 @@ async function procesar(mensaje: MensajeEntrante): Promise<void> {
     return;
   }
 
-  // Interpretación con OpenAI.
+  // Interpretación con Claude.
   const interp = await interpretar(mensaje.texto);
 
   let respuesta: string;

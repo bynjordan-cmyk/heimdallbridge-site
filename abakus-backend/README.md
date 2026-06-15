@@ -7,7 +7,7 @@ Registra ingresos, egresos y cuentas por cobrar mediante lenguaje natural.
 
 ## Stack
 
-WhatsApp Cloud API → Express (TypeScript) → OpenAI `gpt-4o-mini` → Supabase → WhatsApp.
+WhatsApp Cloud API → Express (TypeScript) → Claude `claude-haiku-4-5` → Supabase → WhatsApp.
 
 ## Quickstart
 
@@ -36,7 +36,7 @@ Endpoints:
 ## Variables de entorno
 
 Ver [`.env.example`](./.env.example). Los secretos (`WHATSAPP_ACCESS_TOKEN`,
-`OPENAI_API_KEY`, `SUPABASE_SERVICE_KEY`) **no se commitean**: van en `.env` local
+`ANTHROPIC_API_KEY`, `SUPABASE_SERVICE_KEY`) **no se commitean**: van en `.env` local
 y en las variables de Railway.
 
 ## Deploy (Railway)

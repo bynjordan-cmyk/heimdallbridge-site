@@ -19,9 +19,9 @@ export const config = {
     verifyToken: required('WHATSAPP_VERIFY_TOKEN'),
     graphVersion: process.env.WHATSAPP_GRAPH_VERSION ?? 'v22.0',
   },
-  openai: {
-    apiKey: required('OPENAI_API_KEY'),
-    model: process.env.OPENAI_MODEL ?? 'gpt-4o-mini',
+  anthropic: {
+    apiKey: required('ANTHROPIC_API_KEY'),
+    model: process.env.ANTHROPIC_MODEL ?? 'claude-haiku-4-5',
   },
   supabase: {
     url: required('SUPABASE_URL'),

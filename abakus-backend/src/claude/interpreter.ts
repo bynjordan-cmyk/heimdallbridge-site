@@ -1,31 +1,48 @@
-import OpenAI from 'openai';
+import Anthropic from '@anthropic-ai/sdk';
 import { config } from '../config';
 import { Interpretacion, TipoInterpretacion } from '../types';
 
-const client = new OpenAI({ apiKey: config.openai.apiKey });
+const client = new Anthropic({ apiKey: config.anthropic.apiKey });
 
 const SYSTEM_PROMPT = `Eres Abakus, un asistente financiero para freelancers y microempresarios latinoamericanos.
-Interpretas mensajes de WhatsApp y devuelves un JSON estructurado.
-
-RESPONDE SOLO CON JSON VÁLIDO, sin markdown, sin explicaciones.
-
-Formato de respuesta:
-{
-  "tipo": "ingreso" | "egreso" | "consulta" | "deuda" | "desconocido",
-  "monto": number | null,
-  "categoria": string | null,
-  "descripcion": string | null,
-  "contraparte": string | null,
-  "fecha_vencimiento": "YYYY-MM-DD" | null,
-  "respuesta": string
-}
+Interpretas mensajes de WhatsApp y devuelves un objeto estructurado.
 
 Reglas:
 - Si el tipo es "consulta", la respuesta debe ser útil y empática.
 - Si el tipo es "desconocido", pide clarificación amigable.
 - Usa lenguaje cercano, sin jerga financiera.
 - Moneda en CLP por defecto (Chile).
-- No inventes datos, solo interpreta lo que el usuario dice.`;
+- No inventes datos, solo interpreta lo que el usuario dice.
+- "respuesta" es el mensaje amigable que se le enviará al usuario.`;
+
+// JSON Schema escrito a mano. Con output_config.format Claude garantiza que la
+// respuesta es JSON válido que cumple este esquema (structured outputs).
+// nullable se expresa con anyOf [..., null]; todos los campos van en required.
+const SCHEMA = {
+  type: 'object',
+  properties: {
+    tipo: {
+      type: 'string',
+      enum: ['ingreso', 'egreso', 'consulta', 'deuda', 'desconocido'],
+    },
+    monto: { anyOf: [{ type: 'number' }, { type: 'null' }] },
+    categoria: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+    descripcion: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+    contraparte: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+    fecha_vencimiento: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+    respuesta: { type: 'string' },
+  },
+  required: [
+    'tipo',
+    'monto',
+    'categoria',
+    'descripcion',
+    'contraparte',
+    'fecha_vencimiento',
+    'respuesta',
+  ],
+  additionalProperties: false,
+} as const;
 
 const TIPOS_VALIDOS: TipoInterpretacion[] = [
   'ingreso',
@@ -38,17 +55,16 @@ const TIPOS_VALIDOS: TipoInterpretacion[] = [
 const RESPUESTA_FALLBACK = 'No estoy seguro de haber entendido 🤔 ¿Me lo cuentas de otra forma?';
 
 export async function interpretar(texto: string): Promise<Interpretacion> {
-  const completion = await client.chat.completions.create({
-    model: config.openai.model,
-    temperature: 0.2,
-    response_format: { type: 'json_object' },
-    messages: [
-      { role: 'system', content: SYSTEM_PROMPT },
-      { role: 'user', content: texto },
-    ],
+  const response = await client.messages.create({
+    model: config.anthropic.model,
+    max_tokens: 1024,
+    system: SYSTEM_PROMPT,
+    messages: [{ role: 'user', content: texto }],
+    output_config: { format: { type: 'json_schema', schema: SCHEMA } },
   });
 
-  const raw = completion.choices[0]?.message?.content ?? '{}';
+  const textBlock = response.content.find((b) => b.type === 'text');
+  const raw = textBlock && textBlock.type === 'text' ? textBlock.text : '{}';
   return normalizar(raw);
 }
 

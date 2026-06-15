@@ -35,7 +35,7 @@ export interface CuentaPorCobrar {
   created_at: string;
 }
 
-// ===== Interpretación de OpenAI =====
+// ===== Interpretación de Claude =====
 
 export type TipoInterpretacion = 'ingreso' | 'egreso' | 'consulta' | 'deuda' | 'desconocido';
 

@@ -5,7 +5,7 @@ import { clp } from '../utils/format';
 export type ComandoEspecial = 'resumen' | 'cobros' | 'ayuda';
 
 /**
- * Detecta comandos especiales que NO pasan por OpenAI (ahorra tokens y latencia).
+ * Detecta comandos especiales que NO pasan por Claude (ahorra tokens y latencia).
  */
 export function detectarComando(texto: string): ComandoEspecial | null {
   const t = texto.trim().toLowerCase();

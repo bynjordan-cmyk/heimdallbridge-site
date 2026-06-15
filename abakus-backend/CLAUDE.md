@@ -15,7 +15,7 @@ WhatsApp Cloud API (Meta)
         ↓
 Express.js (Node/TypeScript) — servidor webhook
         ↓
-OpenAI gpt-4o-mini — interpreta el mensaje
+Claude (Anthropic) claude-haiku-4-5 — interpreta el mensaje
         ↓
 Supabase (PostgreSQL) — persiste datos
         ↓
@@ -38,11 +38,11 @@ IDs públicos conocidos (sí están en `.env.example`):
 - `META_APP_ID=1039748735141035` (App: Abakus2, portafolio heyabakus)
 - `WHATSAPP_VERIFY_TOKEN=abakus_webhook_2024`
 - `SUPABASE_URL=https://iszuxcphtatbxmrzoeyk.supabase.co`
-- `OPENAI_MODEL=gpt-4o-mini`
+- `ANTHROPIC_MODEL=claude-haiku-4-5`
 
 Secretos (placeholder vacío en `.env.example`, valor real solo en `.env` / Railway):
 - `WHATSAPP_ACCESS_TOKEN` — token del System User "Abakus-bot"
-- `OPENAI_API_KEY`
+- `ANTHROPIC_API_KEY`
 - `SUPABASE_SERVICE_KEY` — service role key
 
 ## Esquema de base de datos (Supabase existente)
@@ -101,8 +101,8 @@ abakus-backend/
 │   │   └── verify.ts         # Responde GET de verificación Meta
 │   ├── whatsapp/
 │   │   └── sender.ts         # Envía mensajes vía Cloud API
-│   ├── openai/
-│   │   └── interpreter.ts    # Llama a gpt-4o-mini
+│   ├── claude/
+│   │   └── interpreter.ts    # Llama a Claude (claude-haiku-4-5)
 │   ├── supabase/
 │   │   ├── client.ts         # Cliente Supabase
 │   │   └── queries.ts        # Buscar usuario, guardar movimiento, etc.
@@ -128,7 +128,7 @@ abakus-backend/
 3. **Filtro mensajes reales** — ignora si no hay `entry[0].changes[0].value.messages[0]` de tipo `text`.
 4. **Buscar usuario** — `SELECT * FROM usuarios WHERE phone = $1`.
 5. **Usuario nuevo → Onboarding** — crea usuario (`estado = 'onboarding'`) y envía bienvenida.
-6. **Usuario existe → OpenAI** — `gpt-4o-mini` con `response_format: json_object` devuelve:
+6. **Usuario existe → Claude** — `claude-haiku-4-5` con structured outputs (`output_config.format`) devuelve:
    ```json
    {
      "tipo": "ingreso|egreso|consulta|deuda|desconocido",
@@ -146,7 +146,7 @@ abakus-backend/
 - Egreso: `📤 Egreso registrado` / `💸 $[monto] | [categoria] | [descripcion]`
 - Deuda: `📋 Cuenta por cobrar registrada` / `👤 [contraparte] | $[monto] | vence [fecha]`
 
-### Comandos especiales (v1) — no pasan por OpenAI
+### Comandos especiales (v1) — no pasan por Claude
 
 - `resumen` / `saldo` → ingresos vs egresos del mes
 - `cobros` / `pendientes` → cuentas por cobrar pendientes
