@@ -1,13 +1,21 @@
 import { createUsuario } from '../supabase/queries';
 
-const BIENVENIDA = `¡Hola! Soy Abakus 🧮, tu asistente financiero por WhatsApp.
+const BIENVENIDA = (nombre: string | null) => {
+  const saludo = nombre ? `¡Hola, ${nombre.split(' ')[0]}! 👋` : '¡Hola! 👋';
+  return `${saludo} Soy *Abakus* 🧮, tu asistente financiero personal por WhatsApp.
 
-Por favor, indícame si quieres registrar un ingreso, egreso, deuda o si tienes alguna consulta específica.`;
+Te ayudo a llevar el control de tus ingresos, gastos y cuentas por cobrar sin apps ni Excel — solo escríbeme en lenguaje natural.
 
-/**
- * Crea el usuario en estado 'onboarding' y devuelve el mensaje de bienvenida.
- */
+Puedes decirme cosas como:
+💰 _"vendí 80000 en diseño web"_
+💸 _"pagué 15000 de internet"_
+📋 _"Carlos me debe 50000 hasta el viernes"_
+📊 _"resumen"_ → tu balance del mes
+
+¿Qué quieres registrar hoy?`;
+};
+
 export async function handleOnboarding(phone: string, nombre: string | null): Promise<string> {
   await createUsuario(phone, nombre);
-  return BIENVENIDA;
+  return BIENVENIDA(nombre);
 }

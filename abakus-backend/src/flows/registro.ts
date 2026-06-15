@@ -6,7 +6,7 @@ import { clp } from '../utils/format';
  * Persiste un ingreso/egreso (movimientos) o una deuda (cuentas_por_cobrar)
  * y devuelve el mensaje de confirmación para el usuario.
  */
-export async function handleRegistro(user: Usuario, interp: Interpretacion): Promise<string> {
+export async function handleRegistro(user: Usuario, interp: Interpretacion, textoOriginal: string): Promise<string> {
   if (interp.monto === null) {
     return 'Entendí que quieres registrar algo, pero no detecté el monto 🤔 ¿Cuánto fue?';
   }
@@ -18,6 +18,7 @@ export async function handleRegistro(user: Usuario, interp: Interpretacion): Pro
       monto: interp.monto,
       categoria: interp.categoria,
       descripcion: interp.descripcion,
+      rawMessage: textoOriginal,
     });
 
     const detalle = [clp(interp.monto), interp.categoria, interp.descripcion]

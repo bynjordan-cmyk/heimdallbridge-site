@@ -29,6 +29,7 @@ export async function insertMovimiento(input: {
   monto: number;
   categoria: string | null;
   descripcion: string | null;
+  rawMessage: string | null;
 }): Promise<Movimiento> {
   const { data, error } = await supabase
     .from('movimientos')
@@ -38,6 +39,7 @@ export async function insertMovimiento(input: {
       monto: input.monto,
       categoria: input.categoria,
       descripcion: input.descripcion,
+      raw_message: input.rawMessage,
     })
     .select()
     .single();

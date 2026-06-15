@@ -83,7 +83,7 @@ async function procesar(mensaje: MensajeEntrante): Promise<void> {
 
   let respuesta: string;
   if (interp.tipo === 'ingreso' || interp.tipo === 'egreso' || interp.tipo === 'deuda') {
-    respuesta = await handleRegistro(usuario, interp);
+    respuesta = await handleRegistro(usuario, interp, mensaje.texto);
   } else {
     // 'consulta' | 'desconocido' → usamos la respuesta del modelo.
     respuesta = interp.respuesta;
