@@ -90,10 +90,11 @@ export async function procesarSeleccionPlan(user: Usuario, texto: string): Promi
     return `No reconocí tu elección 🤔 Responde *1* para Plan Básico o *2* para Plan Pro.`;
   }
 
-  await updateUsuario(user.phone, { estado_conversacion: null });
-
   const email = user.email ?? '';
-  return crearYEnviarLink(user.phone, email, plan);
+  const respuesta = await crearYEnviarLink(user.phone, email, plan);
+  // Limpiamos el estado solo después de un link generado con éxito.
+  await updateUsuario(user.phone, { estado_conversacion: null });
+  return respuesta;
 }
 
 function detectarPlan(texto: string): PlanAbakus | null {

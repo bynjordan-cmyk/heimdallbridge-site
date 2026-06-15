@@ -59,6 +59,11 @@ export async function crearSuscripcion(
   const { data } = await axios.post<PreapprovalResponse>(`${API}/preapproval`, body, {
     headers: authHeaders(),
     timeout: 15_000,
+  }).catch((err: unknown) => {
+    if (axios.isAxiosError(err)) {
+      console.error('[abakus][mp] Error API preapproval:', JSON.stringify(err.response?.data ?? err.message));
+    }
+    throw err;
   });
 
   return data.init_point;
