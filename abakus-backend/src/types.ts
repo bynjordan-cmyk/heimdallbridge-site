@@ -10,6 +10,8 @@ export interface Usuario {
   tono: string | null;
   onboarding_step: number | null;
   trial_ends_at: string | null;
+  email: string | null;
+  estado_conversacion: string | null;
   created_at: string;
 }
 

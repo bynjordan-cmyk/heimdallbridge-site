@@ -1,7 +1,6 @@
 import { Usuario } from '../types';
 import { getCuentasPendientes, getResumenMes } from '../supabase/queries';
 import { clp } from '../utils/format';
-import { config } from '../config';
 
 export type ComandoEspecial = 'resumen' | 'cobros' | 'ayuda' | 'pago';
 
@@ -42,17 +41,7 @@ export async function handleComando(user: Usuario, comando: ComandoEspecial): Pr
     return AYUDA;
   }
 
-  if (comando === 'pago') {
-    if (!config.pago.mercadopagoLink) {
-      return '🚧 La suscripción estará disponible muy pronto. ¡Te avisaré apenas se active! 🙌';
-    }
-    return `💳 *Activa tu plan Abakus*
-
-Suscríbete de forma segura con Mercado Pago aquí:
-${config.pago.mercadopagoLink}
-
-Una vez completado el pago, tu cuenta queda activa al instante. ¡Gracias por confiar en Abakus! 🧮`;
-  }
+  // 'pago' se gestiona en el flujo de suscripción (handler), no aquí.
 
   if (comando === 'resumen') {
     const { ingresos, egresos, balance } = await getResumenMes(user.phone);

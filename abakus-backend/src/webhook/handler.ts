@@ -7,7 +7,13 @@ import { sendText } from '../whatsapp/sender';
 import { handleOnboarding } from '../flows/onboarding';
 import { handleRegistro } from '../flows/registro';
 import { detectarComando, handleComando } from '../flows/consulta';
-import { accesoVigente, mensajeTrialVencido } from '../flows/suscripcion';
+import {
+  accesoVigente,
+  esperandoEmail,
+  iniciarSuscripcion,
+  mensajeTrialVencido,
+  procesarEmailSuscripcion,
+} from '../flows/suscripcion';
 
 const ERROR_GENERICO = 'Ups, algo salió mal 😅 Intenta de nuevo en un momento.';
 
@@ -71,8 +77,20 @@ async function procesar(mensaje: MensajeEntrante): Promise<void> {
     return;
   }
 
+  // Si el usuario está completando su suscripción, esperamos su email.
+  if (esperandoEmail(usuario)) {
+    const respuesta = await procesarEmailSuscripcion(usuario, mensaje.texto);
+    await sendText(mensaje.phone, respuesta);
+    return;
+  }
+
   // Comandos especiales: no pasan por Claude.
   const comando = detectarComando(mensaje.texto);
+  if (comando === 'pago') {
+    const respuesta = await iniciarSuscripcion(usuario);
+    await sendText(mensaje.phone, respuesta);
+    return;
+  }
   if (comando) {
     const respuesta = await handleComando(usuario, comando);
     await sendText(mensaje.phone, respuesta);

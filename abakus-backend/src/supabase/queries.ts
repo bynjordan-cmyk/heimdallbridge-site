@@ -23,6 +23,24 @@ export async function createUsuario(phone: string, nombre: string | null): Promi
   return data as Usuario;
 }
 
+/** Actualiza campos arbitrarios del usuario por teléfono. */
+export async function updateUsuario(
+  phone: string,
+  campos: Partial<Pick<Usuario, 'email' | 'estado_conversacion' | 'plan' | 'activo'>>,
+): Promise<void> {
+  const { error } = await supabase.from('usuarios').update(campos).eq('phone', phone);
+  if (error) throw error;
+}
+
+/** Marca al usuario como premium (pago confirmado) o lo regresa a gratis (cancelación). */
+export async function setPlan(phone: string, plan: 'premium' | 'gratis'): Promise<void> {
+  const { error } = await supabase
+    .from('usuarios')
+    .update({ plan, activo: plan === 'premium' })
+    .eq('phone', phone);
+  if (error) throw error;
+}
+
 export async function insertMovimiento(input: {
   userPhone: string;
   tipo: TipoMovimiento;
