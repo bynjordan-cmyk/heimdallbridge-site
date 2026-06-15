@@ -18,7 +18,12 @@ export function detectarComando(texto: string): ComandoEspecial | null {
     t === 'pagar' || t === 'suscribirme' || t === 'suscribir' ||
     t === 'suscripción' || t === 'suscripcion' || t === 'plan' || t === 'premium'
   ) return 'pago';
-  if (t === 'reporte' || t.startsWith('reporte ') || t === 'informe' || t.startsWith('informe ') || t === 'exportar') return 'reporte';
+  if (
+    t === 'reporte' || t.startsWith('reporte ') ||
+    t === 'informe' || t.startsWith('informe ') ||
+    t === 'exportar' || t === 'exporta' ||
+    t.includes('excel') || t.includes('reporte') || t.includes('informe')
+  ) return 'reporte';
   if (t === 'deshacer' || t === 'undo' || t === 'borra el último' || t === 'borrar último' || t === 'eliminar último') return 'eliminar';
   if (t === 'comparar' || t === 'comparativo' || t === 'tendencia' || t.includes('vs el mes') || t.includes('mes pasado')) return 'comparar';
   if (t === 'meta' || t.startsWith('meta ') || t === 'objetivo' || t.startsWith('objetivo ') || t.startsWith('mi meta')) return 'meta';

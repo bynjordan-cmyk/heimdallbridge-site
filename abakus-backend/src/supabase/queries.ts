@@ -26,7 +26,7 @@ export async function createUsuario(phone: string, nombre: string | null): Promi
 /** Actualiza campos arbitrarios del usuario por teléfono. */
 export async function updateUsuario(
   phone: string,
-  campos: Partial<Pick<Usuario, 'email' | 'estado_conversacion' | 'plan' | 'activo'>>,
+  campos: Partial<Pick<Usuario, 'nombre' | 'email' | 'estado_conversacion' | 'plan' | 'activo'>>,
 ): Promise<void> {
   const { error } = await supabase.from('usuarios').update(campos).eq('phone', phone);
   if (error) throw error;

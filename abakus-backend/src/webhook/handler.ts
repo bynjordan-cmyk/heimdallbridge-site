@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { MensajeEntrante, WhatsAppWebhookBody } from '../types';
 import { yaProcesado } from '../utils/idempotency';
-import { getUsuarioByPhone } from '../supabase/queries';
+import { getUsuarioByPhone, updateUsuario } from '../supabase/queries';
 import { interpretar } from '../claude/interpreter';
 import { sendText } from '../whatsapp/sender';
 import { handleOnboarding } from '../flows/onboarding';
@@ -125,6 +125,11 @@ async function procesar(mensaje: MensajeEntrante): Promise<void> {
 
   // Interpretación con Claude.
   const interp = await interpretar(mensaje.texto);
+
+  // Persistir nombre si el usuario se presentó y aún no lo tenemos.
+  if (interp.nombre && !usuario.nombre) {
+    await updateUsuario(usuario.phone, { nombre: interp.nombre });
+  }
 
   // cobro y eliminar detectados por Claude también pasan por handleRegistro.
   const esAccionDatos = interp.tipo === 'ingreso' || interp.tipo === 'egreso' ||

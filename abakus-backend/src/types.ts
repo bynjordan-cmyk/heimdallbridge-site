@@ -48,6 +48,7 @@ export type TipoInterpretacion = 'ingreso' | 'egreso' | 'consulta' | 'deuda' | '
 
 export interface Interpretacion {
   tipo: TipoInterpretacion;
+  nombre: string | null;
   monto: number | null;
   categoria: string | null;
   descripcion: string | null;
