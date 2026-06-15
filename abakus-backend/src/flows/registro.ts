@@ -5,8 +5,10 @@ import {
   insertCuentaPorCobrar,
   insertMovimiento,
   marcarCobrado,
+  getMovimientosPeriodo,
 } from '../supabase/queries';
 import { clp } from '../utils/format';
+import { mesActual } from '../reports/periodo';
 
 const LIMITE_CUENTAS_BASICO = 3;
 
@@ -58,9 +60,22 @@ export async function handleRegistro(
       .filter(Boolean)
       .join(' | ');
 
-    return interp.tipo === 'ingreso'
-      ? `✅ Ingreso registrado\n💰 ${detalle}`
-      : `📤 Egreso registrado\n💸 ${detalle}`;
+    if (interp.tipo === 'ingreso') {
+      return `✅ Ingreso registrado\n💰 ${detalle}`;
+    }
+
+    // Egreso: calcular balance del mes y alertar si es negativo
+    const periodo = mesActual();
+    const movs = await getMovimientosPeriodo(user.phone, periodo.desde, periodo.hasta);
+    const totalIngresos = movs.filter((m) => m.tipo === 'ingreso').reduce((s, m) => s + Number(m.monto), 0);
+    const totalEgresos = movs.filter((m) => m.tipo === 'egreso').reduce((s, m) => s + Number(m.monto), 0);
+    const balance = totalIngresos - totalEgresos;
+
+    const alertaBalance = balance < 0
+      ? `\n\n⚠️ _Balance del mes: -${clp(Math.abs(balance))}. Escribe *resumen* para ver el detalle._`
+      : '';
+
+    return `📤 Egreso registrado\n💸 ${detalle}${alertaBalance}`;
   }
 
   // tipo === 'deuda' → cuenta por cobrar

@@ -15,6 +15,28 @@ export interface Periodo {
   label: string;  // "Junio 2026"
 }
 
+function buildPeriodo(anio: number, mes: number): Periodo {
+  const ultimoDia = new Date(anio, mes, 0).getDate();
+  const mm = String(mes).padStart(2, '0');
+  return {
+    desde: `${anio}-${mm}-01`,
+    hasta: `${anio}-${mm}-${ultimoDia}`,
+    label: `${MESES_ES[mes]} ${anio}`,
+  };
+}
+
+export function mesActual(): Periodo {
+  const hoy = new Date();
+  return buildPeriodo(hoy.getFullYear(), hoy.getMonth() + 1);
+}
+
+export function mesPasado(): Periodo {
+  const hoy = new Date();
+  const mes = hoy.getMonth(); // 0 = enero → mes pasado
+  const anio = mes === 0 ? hoy.getFullYear() - 1 : hoy.getFullYear();
+  return buildPeriodo(anio, mes === 0 ? 12 : mes);
+}
+
 /**
  * Parsea el texto del usuario para detectar el período del reporte.
  * Soporta: "reporte", "reporte mayo", "reporte mayo 2025".
@@ -38,12 +60,5 @@ export function parsearPeriodo(texto: string): Periodo {
     }
   }
 
-  const ultimoDia = new Date(anio, mes, 0).getDate();
-  const mm = String(mes).padStart(2, '0');
-
-  return {
-    desde: `${anio}-${mm}-01`,
-    hasta: `${anio}-${mm}-${ultimoDia}`,
-    label: `${MESES_ES[mes]} ${anio}`,
-  };
+  return buildPeriodo(anio, mes);
 }

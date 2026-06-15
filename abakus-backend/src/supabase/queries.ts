@@ -198,6 +198,47 @@ export async function marcarCobrado(
   return cuenta;
 }
 
+/** Obtiene todos los usuarios activos (trial vigente o plan de pago). */
+export async function getUsuariosActivos(): Promise<Usuario[]> {
+  const { data, error } = await supabase
+    .from('usuarios')
+    .select('*')
+    .neq('onboarding_step', null); // excluye filas vacías; todos tienen este campo
+
+  if (error) throw error;
+  return (data ?? []) as Usuario[];
+}
+
+/** Cuentas pendientes con vencimiento dentro de N días, sin recordatorio enviado. */
+export async function getCuentasPorVencer(
+  userPhone: string,
+  dias: number,
+): Promise<CuentaPorCobrar[]> {
+  const hoy = new Date().toISOString().slice(0, 10);
+  const limite = new Date(Date.now() + dias * 86_400_000).toISOString().slice(0, 10);
+
+  const { data, error } = await supabase
+    .from('cuentas_pendientes')
+    .select('*')
+    .eq('user_phone', userPhone)
+    .eq('pagado', false)
+    .eq('recordatorio_enviado', false)
+    .gte('fecha_vencimiento', hoy)
+    .lte('fecha_vencimiento', limite)
+    .order('fecha_vencimiento', { ascending: true });
+
+  if (error) throw error;
+  return (data ?? []) as CuentaPorCobrar[];
+}
+
+export async function marcarRecordatorioEnviado(id: string): Promise<void> {
+  const { error } = await supabase
+    .from('cuentas_pendientes')
+    .update({ recordatorio_enviado: true })
+    .eq('id', id);
+  if (error) throw error;
+}
+
 /**
  * Elimina el movimiento más reciente del usuario.
  * Devuelve el movimiento eliminado, o null si no había ninguno.
