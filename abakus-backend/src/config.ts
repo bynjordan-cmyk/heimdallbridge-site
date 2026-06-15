@@ -36,6 +36,6 @@ export const config = {
     precioPro: Number(process.env.MERCADOPAGO_PRECIO_PLAN_PRO ?? 0),
     moneda: process.env.MERCADOPAGO_MONEDA ?? 'CLP',
     // URL pública del backend (para back_url y notification_url de MP).
-    publicUrl: process.env.PUBLIC_URL ?? '',
+    publicUrl: (process.env.PUBLIC_URL ?? '').trim(),
   },
 } as const;
