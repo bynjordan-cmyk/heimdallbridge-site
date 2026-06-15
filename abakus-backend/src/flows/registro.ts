@@ -1,14 +1,45 @@
 import { Interpretacion, Usuario } from '../types';
-import { contarCuentasPendientes, insertCuentaPorCobrar, insertMovimiento } from '../supabase/queries';
+import {
+  contarCuentasPendientes,
+  eliminarUltimoMovimiento,
+  insertCuentaPorCobrar,
+  insertMovimiento,
+  marcarCobrado,
+} from '../supabase/queries';
 import { clp } from '../utils/format';
 
 const LIMITE_CUENTAS_BASICO = 3;
 
-/**
- * Persiste un ingreso/egreso (movimientos) o una deuda (cuentas_pendientes)
- * y devuelve el mensaje de confirmación para el usuario.
- */
-export async function handleRegistro(user: Usuario, interp: Interpretacion, textoOriginal: string): Promise<string> {
+export async function handleRegistro(
+  user: Usuario,
+  interp: Interpretacion,
+  textoOriginal: string,
+): Promise<string> {
+
+  // === Marcar deuda como cobrada ===
+  if (interp.tipo === 'cobro') {
+    const cuenta = await marcarCobrado(user.phone, interp.contraparte, interp.monto);
+    if (!cuenta) {
+      const quien = interp.contraparte ? `de *${interp.contraparte}*` : 'pendiente';
+      return `Mmm, no encontré ninguna cuenta ${quien} activa 🤔 ¿Ya la habías marcado antes?`;
+    }
+    return `✅ ¡Cobro registrado!\n👤 ${cuenta.contraparte ?? 'Sin contraparte'} | ${clp(Number(cuenta.monto))} marcado como *pagado*. 🎉`;
+  }
+
+  // === Eliminar último movimiento ===
+  if (interp.tipo === 'eliminar') {
+    const mov = await eliminarUltimoMovimiento(user.phone);
+    if (!mov) {
+      return 'No encontré movimientos recientes para borrar 🤔';
+    }
+    const detalle = [clp(Number(mov.monto)), mov.categoria, mov.descripcion]
+      .filter(Boolean)
+      .join(' | ');
+    const emoji = mov.tipo === 'ingreso' ? '💰' : '💸';
+    return `🗑️ Listo, borré el último movimiento:\n${emoji} ${detalle}`;
+  }
+
+  // === Registro de monto requerido ===
   if (interp.monto === null) {
     return 'Entendí que quieres registrar algo, pero no detecté el monto 🤔 ¿Cuánto fue?';
   }

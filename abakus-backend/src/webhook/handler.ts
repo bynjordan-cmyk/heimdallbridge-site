@@ -104,8 +104,21 @@ async function procesar(mensaje: MensajeEntrante): Promise<void> {
     await handleReporte(usuario, mensaje.texto);
     return;
   }
+  if (comando === 'eliminar') {
+    // Comando directo de deshacer: no requiere Claude.
+    const { eliminarUltimoMovimiento } = await import('../supabase/queries');
+    const { clp } = await import('../utils/format');
+    const mov = await eliminarUltimoMovimiento(usuario.phone);
+    if (!mov) {
+      await sendText(mensaje.phone, 'No encontré movimientos recientes para borrar 🤔');
+    } else {
+      const detalle = [clp(Number(mov.monto)), mov.categoria, mov.descripcion].filter(Boolean).join(' | ');
+      await sendText(mensaje.phone, `🗑️ Borré el último movimiento:\n${mov.tipo === 'ingreso' ? '💰' : '💸'} ${detalle}`);
+    }
+    return;
+  }
   if (comando) {
-    const respuesta = await handleComando(usuario, comando);
+    const respuesta = await handleComando(usuario, comando, mensaje.texto);
     await sendText(mensaje.phone, respuesta);
     return;
   }
@@ -113,18 +126,19 @@ async function procesar(mensaje: MensajeEntrante): Promise<void> {
   // Interpretación con Claude.
   const interp = await interpretar(mensaje.texto);
 
-  const esRegistro =
-    interp.tipo === 'ingreso' || interp.tipo === 'egreso' || interp.tipo === 'deuda';
+  // cobro y eliminar detectados por Claude también pasan por handleRegistro.
+  const esAccionDatos = interp.tipo === 'ingreso' || interp.tipo === 'egreso' ||
+    interp.tipo === 'deuda' || interp.tipo === 'cobro' || interp.tipo === 'eliminar';
 
-  // Candado de prueba: solo se bloquean los registros cuando la prueba expiró.
-  // Consultas, saludos y el comando "suscribirme" siguen disponibles.
-  if (esRegistro && !accesoVigente(usuario)) {
+  // Candado de trial: solo bloquea nuevos registros (ingreso/egreso/deuda).
+  const requiereAcceso = interp.tipo === 'ingreso' || interp.tipo === 'egreso' || interp.tipo === 'deuda';
+  if (requiereAcceso && !accesoVigente(usuario)) {
     await sendText(mensaje.phone, mensajeTrialVencido());
     return;
   }
 
   let respuesta: string;
-  if (esRegistro) {
+  if (esAccionDatos) {
     respuesta = await handleRegistro(usuario, interp, mensaje.texto);
   } else {
     // 'consulta' | 'desconocido' → usamos la respuesta del modelo.

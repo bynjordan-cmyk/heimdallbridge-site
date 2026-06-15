@@ -159,3 +159,65 @@ export async function getCuentasPendientes(userPhone: string): Promise<CuentaPor
   if (error) throw error;
   return (data ?? []) as CuentaPorCobrar[];
 }
+
+/**
+ * Marca como pagada la cuenta más reciente que coincida con la contraparte (y monto, si se da).
+ * Devuelve la cuenta actualizada, o null si no encontró ninguna.
+ */
+export async function marcarCobrado(
+  userPhone: string,
+  contraparte: string | null,
+  monto: number | null,
+): Promise<CuentaPorCobrar | null> {
+  let query = supabase
+    .from('cuentas_pendientes')
+    .select('*')
+    .eq('user_phone', userPhone)
+    .eq('pagado', false)
+    .order('created_at', { ascending: false })
+    .limit(1);
+
+  if (contraparte) {
+    query = query.ilike('contraparte', `%${contraparte}%`);
+  }
+  if (monto !== null) {
+    query = query.eq('monto', monto);
+  }
+
+  const { data, error } = await query.maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+
+  const cuenta = data as CuentaPorCobrar;
+  const { error: updateError } = await supabase
+    .from('cuentas_pendientes')
+    .update({ pagado: true })
+    .eq('id', cuenta.id);
+
+  if (updateError) throw updateError;
+  return cuenta;
+}
+
+/**
+ * Elimina el movimiento más reciente del usuario.
+ * Devuelve el movimiento eliminado, o null si no había ninguno.
+ */
+export async function eliminarUltimoMovimiento(
+  userPhone: string,
+): Promise<Movimiento | null> {
+  const { data, error } = await supabase
+    .from('movimientos')
+    .select('*')
+    .eq('user_phone', userPhone)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) return null;
+
+  const mov = data as Movimiento;
+  const { error: delError } = await supabase.from('movimientos').delete().eq('id', mov.id);
+  if (delError) throw delError;
+  return mov;
+}

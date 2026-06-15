@@ -10,31 +10,33 @@ Interpretas mensajes de WhatsApp y devuelves un objeto JSON estructurado.
 TIPOS posibles:
 - "ingreso": el usuario recibió o cobró dinero (vendí, cobré, me pagaron, entró, recibí...)
 - "egreso": el usuario gastó o pagó algo (pagué, gasté, compré, salió, me cobró...)
-- "deuda": alguien le debe dinero (me debe, le presté, pendiente de cobro...)
+- "deuda": alguien le debe dinero al usuario (me debe, le presté, pendiente de cobro, queda debiendo...)
+- "cobro": alguien pagó una deuda que tenía con el usuario (me pagó, me saldó, ya cobré a, recibí el pago de...)
+- "eliminar": el usuario quiere borrar el último movimiento registrado (me equivoqué, borra el último, deshacer, undo, error...)
 - "consulta": pregunta sobre sus datos, saludos, agradecimientos, o cualquier mensaje fuera de registro
 - "desconocido": el mensaje es ambiguo y necesita clarificación
 
 REGLAS:
 - Moneda CLP por defecto (Chile). Si dice "$50.000" o "50 mil" → monto = 50000.
 - No inventes datos: si no hay monto claro, monto = null.
-- Para "consulta" y "desconocido", monto/categoria/descripcion/contraparte/fecha_vencimiento = null.
+- Para "cobro": contraparte = quien pagó, monto = cuánto pagó (o null si no lo dice).
+- Para "eliminar" y "consulta" y "desconocido": todos los campos extras = null.
 - El campo "respuesta" es lo que se enviará al usuario por WhatsApp. Sé cálido, breve y con emojis moderados.
 
 ESTILO de respuesta según tipo:
 - ingreso/egreso/deuda registrado: confirma brevemente lo que entendiste.
-- consulta (saludo, gracias, preguntas generales): responde amigable, ofrécete a ayudar. Ej: "¡Con gusto! 😊 Siempre a la orden. ¿Quieres registrar algo o revisar tu resumen del mes?"
+- cobro: confirma que vas a marcar como cobrada. Ej: "¡Excelente! 🎉 Marcando el pago de [contraparte] como cobrado."
+- eliminar: confirma que vas a borrar. Ej: "Entendido, borrando el último movimiento registrado. 🗑️"
+- consulta (saludo, gracias, preguntas generales): responde amigable, ofrécete a ayudar.
 - desconocido: pide clarificación con un ejemplo. Ej: "Mmm, no entendí bien 🤔 ¿Me dices si fue un ingreso o un gasto? Por ejemplo: 'cobré 30000 por una asesoría'"`;
 
-
-// JSON Schema escrito a mano. Con output_config.format Claude garantiza que la
-// respuesta es JSON válido que cumple este esquema (structured outputs).
-// nullable se expresa con anyOf [..., null]; todos los campos van en required.
+// JSON Schema escrito a mano para structured outputs.
 const SCHEMA = {
   type: 'object',
   properties: {
     tipo: {
       type: 'string',
-      enum: ['ingreso', 'egreso', 'consulta', 'deuda', 'desconocido'],
+      enum: ['ingreso', 'egreso', 'consulta', 'deuda', 'cobro', 'eliminar', 'desconocido'],
     },
     monto: { anyOf: [{ type: 'number' }, { type: 'null' }] },
     categoria: { anyOf: [{ type: 'string' }, { type: 'null' }] },
@@ -60,6 +62,8 @@ const TIPOS_VALIDOS: TipoInterpretacion[] = [
   'egreso',
   'consulta',
   'deuda',
+  'cobro',
+  'eliminar',
   'desconocido',
 ];
 
