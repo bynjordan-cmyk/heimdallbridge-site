@@ -15,7 +15,7 @@ export async function getUsuarioByPhone(phone: string): Promise<Usuario | null> 
 export async function createUsuario(phone: string, nombre: string | null): Promise<Usuario> {
   const { data, error } = await supabase
     .from('usuarios')
-    .insert({ phone, nombre, estado: 'onboarding' })
+    .insert({ phone, nombre })
     .select()
     .single();
 
@@ -24,7 +24,7 @@ export async function createUsuario(phone: string, nombre: string | null): Promi
 }
 
 export async function insertMovimiento(input: {
-  userId: string;
+  userPhone: string;
   tipo: TipoMovimiento;
   monto: number;
   categoria: string | null;
@@ -33,7 +33,7 @@ export async function insertMovimiento(input: {
   const { data, error } = await supabase
     .from('movimientos')
     .insert({
-      user_id: input.userId,
+      user_phone: input.userPhone,
       tipo: input.tipo,
       monto: input.monto,
       categoria: input.categoria,
@@ -47,16 +47,17 @@ export async function insertMovimiento(input: {
 }
 
 export async function insertCuentaPorCobrar(input: {
-  userId: string;
+  userPhone: string;
   contraparte: string | null;
   monto: number;
   descripcion: string | null;
   fechaVencimiento: string | null;
 }): Promise<CuentaPorCobrar> {
   const { data, error } = await supabase
-    .from('cuentas_por_cobrar')
+    .from('cuentas_pendientes')
     .insert({
-      user_id: input.userId,
+      user_phone: input.userPhone,
+      tipo: 'por_cobrar',
       contraparte: input.contraparte,
       monto: input.monto,
       descripcion: input.descripcion,
@@ -75,7 +76,7 @@ export interface ResumenMes {
   balance: number;
 }
 
-export async function getResumenMes(userId: string): Promise<ResumenMes> {
+export async function getResumenMes(userPhone: string): Promise<ResumenMes> {
   const inicioMes = new Date();
   inicioMes.setUTCDate(1);
   inicioMes.setUTCHours(0, 0, 0, 0);
@@ -84,7 +85,7 @@ export async function getResumenMes(userId: string): Promise<ResumenMes> {
   const { data, error } = await supabase
     .from('movimientos')
     .select('tipo, monto')
-    .eq('user_id', userId)
+    .eq('user_phone', userPhone)
     .gte('fecha', desde);
 
   if (error) throw error;
@@ -99,12 +100,12 @@ export async function getResumenMes(userId: string): Promise<ResumenMes> {
   return { ingresos, egresos, balance: ingresos - egresos };
 }
 
-export async function getCuentasPendientes(userId: string): Promise<CuentaPorCobrar[]> {
+export async function getCuentasPendientes(userPhone: string): Promise<CuentaPorCobrar[]> {
   const { data, error } = await supabase
-    .from('cuentas_por_cobrar')
+    .from('cuentas_pendientes')
     .select('*')
-    .eq('user_id', userId)
-    .eq('estado', 'pendiente')
+    .eq('user_phone', userPhone)
+    .eq('pagado', false)
     .order('fecha_vencimiento', { ascending: true, nullsFirst: false });
 
   if (error) throw error;

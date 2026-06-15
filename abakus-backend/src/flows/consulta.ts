@@ -30,7 +30,7 @@ export async function handleComando(user: Usuario, comando: ComandoEspecial): Pr
   }
 
   if (comando === 'resumen') {
-    const { ingresos, egresos, balance } = await getResumenMes(user.id);
+    const { ingresos, egresos, balance } = await getResumenMes(user.phone);
     return `📊 *Resumen del mes*
 💰 Ingresos: ${clp(ingresos)}
 💸 Egresos: ${clp(egresos)}
@@ -38,7 +38,7 @@ export async function handleComando(user: Usuario, comando: ComandoEspecial): Pr
   }
 
   // comando === 'cobros'
-  const cuentas = await getCuentasPendientes(user.id);
+  const cuentas = await getCuentasPendientes(user.phone);
   if (cuentas.length === 0) {
     return '🎉 No tienes cuentas por cobrar pendientes.';
   }

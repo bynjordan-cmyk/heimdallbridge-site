@@ -1,21 +1,22 @@
 // ===== Modelos de dominio (espejo del esquema Supabase) =====
 
-export type EstadoUsuario = 'onboarding' | 'activo';
-
 export interface Usuario {
   id: string;
-  phone: string; // formato normalizado: +56935594094
+  phone: string; // formato: solo dígitos, sin '+' (ej: 56935594094)
   nombre: string | null;
-  estado: EstadoUsuario;
+  plan: string | null;
+  activo: boolean | null;
+  negocio: string | null;
+  tono: string | null;
+  onboarding_step: number | null;
   created_at: string;
-  updated_at: string;
 }
 
 export type TipoMovimiento = 'ingreso' | 'egreso';
 
 export interface Movimiento {
   id: string;
-  user_id: string;
+  user_phone: string;
   tipo: TipoMovimiento;
   monto: number;
   categoria: string | null;
@@ -26,12 +27,14 @@ export interface Movimiento {
 
 export interface CuentaPorCobrar {
   id: string;
-  user_id: string;
+  user_phone: string;
+  tipo: string;
   contraparte: string | null;
   monto: number;
   descripcion: string | null;
   fecha_vencimiento: string | null;
-  estado: 'pendiente' | 'cobrado';
+  pagado: boolean | null;
+  recordatorio_enviado: boolean | null;
   created_at: string;
 }
 
@@ -52,7 +55,7 @@ export interface Interpretacion {
 // ===== Mensaje entrante ya normalizado =====
 
 export interface MensajeEntrante {
-  phone: string; // normalizado con '+'
+  phone: string; // normalizado: solo dígitos, sin '+'
   texto: string;
   messageId: string;
   nombre: string | null;

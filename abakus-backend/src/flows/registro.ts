@@ -13,7 +13,7 @@ export async function handleRegistro(user: Usuario, interp: Interpretacion): Pro
 
   if (interp.tipo === 'ingreso' || interp.tipo === 'egreso') {
     await insertMovimiento({
-      userId: user.id,
+      userPhone: user.phone,
       tipo: interp.tipo,
       monto: interp.monto,
       categoria: interp.categoria,
@@ -31,7 +31,7 @@ export async function handleRegistro(user: Usuario, interp: Interpretacion): Pro
 
   // tipo === 'deuda' → cuenta por cobrar
   await insertCuentaPorCobrar({
-    userId: user.id,
+    userPhone: user.phone,
     contraparte: interp.contraparte,
     monto: interp.monto,
     descripcion: interp.descripcion,
