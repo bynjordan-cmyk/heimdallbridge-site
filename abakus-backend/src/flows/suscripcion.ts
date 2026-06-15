@@ -114,10 +114,10 @@ function mensajeSeleccionPlan(): string {
   return `¡Perfecto! Elige tu plan:
 
 1️⃣ *Plan Básico* — ${precioBasico}/mes
-Registro ilimitado de ingresos, egresos y deudas. Resumen financiero mensual.
+Ingresos y egresos ilimitados. Hasta 3 cuentas por cobrar activas. Historial de 90 días.
 
 2️⃣ *Plan Pro* — ${precioPro}/mes
-Todo el Plan Básico + funcionalidades avanzadas.
+Todo el Básico + cuentas ilimitadas, historial completo, recordatorios automáticos de cobro y reporte exportable. ⭐
 
 Responde *1* para Básico o *2* para Pro.`;
 }

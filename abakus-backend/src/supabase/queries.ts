@@ -120,6 +120,17 @@ export async function getResumenMes(userPhone: string): Promise<ResumenMes> {
   return { ingresos, egresos, balance: ingresos - egresos };
 }
 
+export async function contarCuentasPendientes(userPhone: string): Promise<number> {
+  const { count, error } = await supabase
+    .from('cuentas_pendientes')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_phone', userPhone)
+    .eq('pagado', false);
+
+  if (error) throw error;
+  return count ?? 0;
+}
+
 export async function getCuentasPendientes(userPhone: string): Promise<CuentaPorCobrar[]> {
   const { data, error } = await supabase
     .from('cuentas_pendientes')

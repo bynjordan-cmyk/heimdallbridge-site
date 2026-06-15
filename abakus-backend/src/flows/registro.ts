@@ -1,6 +1,8 @@
 import { Interpretacion, Usuario } from '../types';
-import { insertCuentaPorCobrar, insertMovimiento } from '../supabase/queries';
+import { contarCuentasPendientes, insertCuentaPorCobrar, insertMovimiento } from '../supabase/queries';
 import { clp } from '../utils/format';
+
+const LIMITE_CUENTAS_BASICO = 3;
 
 /**
  * Persiste un ingreso/egreso (movimientos) o una deuda (cuentas_pendientes)
@@ -31,6 +33,14 @@ export async function handleRegistro(user: Usuario, interp: Interpretacion, text
   }
 
   // tipo === 'deuda' → cuenta por cobrar
+  // Plan Básico: máximo 3 cuentas activas.
+  if (user.plan === 'basico') {
+    const activas = await contarCuentasPendientes(user.phone);
+    if (activas >= LIMITE_CUENTAS_BASICO) {
+      return `⚠️ Con el *Plan Básico* puedes tener hasta ${LIMITE_CUENTAS_BASICO} cuentas por cobrar activas.\n\nMarca alguna como cobrada o actualiza al *Plan Pro* escribiendo *suscribirme* para tener cuentas ilimitadas. 🚀`;
+    }
+  }
+
   await insertCuentaPorCobrar({
     userPhone: user.phone,
     contraparte: interp.contraparte,
