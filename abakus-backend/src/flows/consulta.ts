@@ -2,7 +2,7 @@ import { Usuario } from '../types';
 import { getCuentasPendientes, getResumenMes } from '../supabase/queries';
 import { clp } from '../utils/format';
 
-export type ComandoEspecial = 'resumen' | 'cobros' | 'ayuda' | 'pago';
+export type ComandoEspecial = 'resumen' | 'cobros' | 'ayuda' | 'pago' | 'reporte';
 
 /**
  * Detecta comandos especiales que NO pasan por Claude (ahorra tokens y latencia).
@@ -23,6 +23,10 @@ export function detectarComando(texto: string): ComandoEspecial | null {
   ) {
     return 'pago';
   }
+  // Reporte Excel: acepta "reporte", "reporte mayo", "reporte mayo 2025", "informe", "exportar"
+  if (t === 'reporte' || t.startsWith('reporte ') || t === 'informe' || t.startsWith('informe ') || t === 'exportar') {
+    return 'reporte';
+  }
   return null;
 }
 
@@ -31,6 +35,7 @@ const AYUDA = `🧮 *Abakus* — esto es lo que puedo hacer:
 • Registra escribiendo natural, ej: "vendí 50000 en diseño" o "pagué 12000 de luz".
 • *resumen* o *saldo* → ingresos vs egresos del mes.
 • *cobros* o *pendientes* → tus cuentas por cobrar.
+• *reporte* → Excel con el detalle completo del mes (o "reporte mayo").
 • Cuéntame una deuda: "Juan me debe 30000 para el 30/06".
 • *plan* o *suscribirme* → activa tu suscripción.
 
@@ -41,7 +46,7 @@ export async function handleComando(user: Usuario, comando: ComandoEspecial): Pr
     return AYUDA;
   }
 
-  // 'pago' se gestiona en el flujo de suscripción (handler), no aquí.
+  // 'pago' y 'reporte' se gestionan en el handler directamente.
 
   if (comando === 'resumen') {
     const { ingresos, egresos, balance } = await getResumenMes(user.phone);

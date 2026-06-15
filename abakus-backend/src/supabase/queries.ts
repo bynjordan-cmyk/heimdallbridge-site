@@ -120,6 +120,23 @@ export async function getResumenMes(userPhone: string): Promise<ResumenMes> {
   return { ingresos, egresos, balance: ingresos - egresos };
 }
 
+export async function getMovimientosPeriodo(
+  userPhone: string,
+  desde: string,
+  hasta: string,
+): Promise<Movimiento[]> {
+  const { data, error } = await supabase
+    .from('movimientos')
+    .select('*')
+    .eq('user_phone', userPhone)
+    .gte('fecha', desde)
+    .lte('fecha', hasta)
+    .order('fecha', { ascending: true });
+
+  if (error) throw error;
+  return (data ?? []) as Movimiento[];
+}
+
 export async function contarCuentasPendientes(userPhone: string): Promise<number> {
   const { count, error } = await supabase
     .from('cuentas_pendientes')

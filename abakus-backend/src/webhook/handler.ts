@@ -7,6 +7,7 @@ import { sendText } from '../whatsapp/sender';
 import { handleOnboarding } from '../flows/onboarding';
 import { handleRegistro } from '../flows/registro';
 import { detectarComando, handleComando } from '../flows/consulta';
+import { handleReporte } from '../flows/reporte';
 import {
   accesoVigente,
   esperandoEmail,
@@ -96,6 +97,11 @@ async function procesar(mensaje: MensajeEntrante): Promise<void> {
   if (comando === 'pago') {
     const respuesta = await iniciarSuscripcion(usuario);
     await sendText(mensaje.phone, respuesta);
+    return;
+  }
+  if (comando === 'reporte') {
+    await sendText(mensaje.phone, '📊 Generando tu reporte, un momento...');
+    await handleReporte(usuario, mensaje.texto);
     return;
   }
   if (comando) {
