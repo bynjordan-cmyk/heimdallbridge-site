@@ -7,6 +7,7 @@ import { sendText } from '../whatsapp/sender';
 import { handleOnboarding } from '../flows/onboarding';
 import { handleRegistro } from '../flows/registro';
 import { detectarComando, handleComando } from '../flows/consulta';
+import { accesoVigente, mensajeTrialVencido } from '../flows/suscripcion';
 
 const ERROR_GENERICO = 'Ups, algo salió mal 😅 Intenta de nuevo en un momento.';
 
@@ -81,8 +82,18 @@ async function procesar(mensaje: MensajeEntrante): Promise<void> {
   // Interpretación con Claude.
   const interp = await interpretar(mensaje.texto);
 
+  const esRegistro =
+    interp.tipo === 'ingreso' || interp.tipo === 'egreso' || interp.tipo === 'deuda';
+
+  // Candado de prueba: solo se bloquean los registros cuando la prueba expiró.
+  // Consultas, saludos y el comando "suscribirme" siguen disponibles.
+  if (esRegistro && !accesoVigente(usuario)) {
+    await sendText(mensaje.phone, mensajeTrialVencido());
+    return;
+  }
+
   let respuesta: string;
-  if (interp.tipo === 'ingreso' || interp.tipo === 'egreso' || interp.tipo === 'deuda') {
+  if (esRegistro) {
     respuesta = await handleRegistro(usuario, interp, mensaje.texto);
   } else {
     // 'consulta' | 'desconocido' → usamos la respuesta del modelo.

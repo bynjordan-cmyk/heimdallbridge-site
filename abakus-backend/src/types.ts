@@ -9,6 +9,7 @@ export interface Usuario {
   negocio: string | null;
   tono: string | null;
   onboarding_step: number | null;
+  trial_ends_at: string | null;
   created_at: string;
 }
 
