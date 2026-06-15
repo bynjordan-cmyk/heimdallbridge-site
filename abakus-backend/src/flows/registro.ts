@@ -3,7 +3,7 @@ import { insertCuentaPorCobrar, insertMovimiento } from '../supabase/queries';
 import { clp } from '../utils/format';
 
 /**
- * Persiste un ingreso/egreso (movimientos) o una deuda (cuentas_por_cobrar)
+ * Persiste un ingreso/egreso (movimientos) o una deuda (cuentas_pendientes)
  * y devuelve el mensaje de confirmación para el usuario.
  */
 export async function handleRegistro(user: Usuario, interp: Interpretacion, textoOriginal: string): Promise<string> {
