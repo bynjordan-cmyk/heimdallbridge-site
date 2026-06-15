@@ -3,9 +3,15 @@ import { config } from '../config';
 
 const API = 'https://api.mercadopago.com';
 
+export type PlanAbakus = 'basico' | 'pro';
+
 /** ¿Está configurada la integración por API de Mercado Pago? */
 export function mpConfigurado(): boolean {
-  return Boolean(config.pago.accessToken && config.pago.precio > 0 && config.pago.publicUrl);
+  return Boolean(
+    config.pago.accessToken &&
+      (config.pago.precioBasico > 0 || config.pago.precioPro > 0) &&
+      config.pago.publicUrl,
+  );
 }
 
 function authHeaders() {
@@ -24,20 +30,26 @@ interface PreapprovalResponse {
 }
 
 /**
- * Crea una suscripción (preapproval) sin plan asociado. El usuario define su
- * medio de pago en el checkout (status 'pending'). external_reference lleva el
- * teléfono para que el webhook sepa a quién activar.
+ * Crea una suscripción (preapproval). external_reference lleva "{phone}|{plan}"
+ * para que el webhook sepa a quién activar y con qué plan.
  * Devuelve el init_point (URL de checkout).
  */
-export async function crearSuscripcion(phone: string, email: string): Promise<string> {
+export async function crearSuscripcion(
+  phone: string,
+  email: string,
+  plan: PlanAbakus,
+): Promise<string> {
+  const precio = plan === 'pro' ? config.pago.precioPro : config.pago.precioBasico;
+  const motivo = plan === 'pro' ? 'Abakus Plan Pro 🧮' : 'Abakus Plan Básico 🧮';
+
   const body = {
-    reason: config.pago.motivo,
-    external_reference: phone,
+    reason: motivo,
+    external_reference: `${phone}|${plan}`,
     payer_email: email,
     auto_recurring: {
       frequency: 1,
       frequency_type: 'months',
-      transaction_amount: config.pago.precio,
+      transaction_amount: precio,
       currency_id: config.pago.moneda,
     },
     back_url: `${config.pago.publicUrl}/gracias`,
@@ -74,4 +86,14 @@ export async function getPayment(id: string): Promise<PaymentResponse> {
     timeout: 15_000,
   });
   return data;
+}
+
+/**
+ * Parsea el external_reference que puede ser "{phone}|{plan}" o solo "{phone}"
+ * (compatibilidad con suscripciones creadas antes de la migración).
+ */
+export function parsearExternalRef(ref: string): { phone: string; plan: PlanAbakus } {
+  const parts = ref.split('|');
+  const plan: PlanAbakus = parts[1] === 'pro' ? 'pro' : 'basico';
+  return { phone: parts[0], plan };
 }

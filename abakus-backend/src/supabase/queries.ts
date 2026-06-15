@@ -32,11 +32,11 @@ export async function updateUsuario(
   if (error) throw error;
 }
 
-/** Marca al usuario como premium (pago confirmado) o lo regresa a gratis (cancelación). */
-export async function setPlan(phone: string, plan: 'premium' | 'gratis'): Promise<void> {
+/** Actualiza el plan del usuario. */
+export async function setPlan(phone: string, plan: 'basico' | 'pro' | 'gratis'): Promise<void> {
   const { error } = await supabase
     .from('usuarios')
-    .update({ plan, activo: plan === 'premium' })
+    .update({ plan, activo: plan !== 'gratis' })
     .eq('phone', phone);
   if (error) throw error;
 }

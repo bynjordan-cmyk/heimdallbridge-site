@@ -32,9 +32,9 @@ export const config = {
     mercadopagoLink: process.env.MERCADOPAGO_LINK ?? '',
     // Integración por API (detección automática del pago).
     accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN ?? '',
-    precio: Number(process.env.MERCADOPAGO_PRECIO ?? 0), // monto mensual (ej: 4990)
+    precioBasico: Number(process.env.MERCADOPAGO_PRECIO_PLAN_BASICO ?? 0),
+    precioPro: Number(process.env.MERCADOPAGO_PRECIO_PLAN_PRO ?? 0),
     moneda: process.env.MERCADOPAGO_MONEDA ?? 'CLP',
-    motivo: process.env.MERCADOPAGO_MOTIVO ?? 'Suscripción Abakus 🧮',
     // URL pública del backend (para back_url y notification_url de MP).
     publicUrl: process.env.PUBLIC_URL ?? '',
   },

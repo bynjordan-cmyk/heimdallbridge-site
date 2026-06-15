@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { getPayment, getPreapproval } from '../pagos/mercadopago';
+import { getPayment, getPreapproval, parsearExternalRef, PlanAbakus } from '../pagos/mercadopago';
 import { setPlan } from '../supabase/queries';
 import { sendText } from '../whatsapp/sender';
 
@@ -21,11 +21,12 @@ async function procesar(req: Request): Promise<void> {
 
   if (tipo === 'preapproval' || tipo === 'subscription_preapproval') {
     const pre = await getPreapproval(id);
-    const phone = pre.external_reference;
-    if (!phone) return;
+    if (!pre.external_reference) return;
+
+    const { phone, plan } = parsearExternalRef(pre.external_reference);
 
     if (pre.status === 'authorized') {
-      await activarPremium(phone);
+      await activarPlan(phone, plan);
     } else if (pre.status === 'cancelled' || pre.status === 'paused') {
       await setPlan(phone, 'gratis');
     }
@@ -35,17 +36,19 @@ async function procesar(req: Request): Promise<void> {
   if (tipo === 'payment') {
     const pago = await getPayment(id);
     if (pago.status === 'approved' && pago.external_reference) {
-      await activarPremium(pago.external_reference);
+      const { phone, plan } = parsearExternalRef(pago.external_reference);
+      await activarPlan(phone, plan);
     }
   }
 }
 
-async function activarPremium(phone: string): Promise<void> {
-  await setPlan(phone, 'premium');
+async function activarPlan(phone: string, plan: PlanAbakus): Promise<void> {
+  await setPlan(phone, plan);
+  const nombrePlan = plan === 'pro' ? 'Pro' : 'Básico';
   try {
     await sendText(
       phone,
-      '🎉 ¡Pago confirmado! Tu plan *Abakus* está activo. Sigue registrando tus finanzas sin límites. ¡Gracias por confiar en nosotros! 🧮',
+      `🎉 ¡Pago confirmado! Tu *Abakus Plan ${nombrePlan}* está activo. Sigue registrando tus finanzas sin límites. ¡Gracias por confiar en nosotros! 🧮`,
     );
   } catch (err) {
     console.error('[abakus][mp] No se pudo enviar confirmación de pago:', err);

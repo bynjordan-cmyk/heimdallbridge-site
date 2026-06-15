@@ -10,9 +10,11 @@ import { detectarComando, handleComando } from '../flows/consulta';
 import {
   accesoVigente,
   esperandoEmail,
+  esperandoPlan,
   iniciarSuscripcion,
   mensajeTrialVencido,
   procesarEmailSuscripcion,
+  procesarSeleccionPlan,
 } from '../flows/suscripcion';
 
 const ERROR_GENERICO = 'Ups, algo salió mal 😅 Intenta de nuevo en un momento.';
@@ -77,9 +79,14 @@ async function procesar(mensaje: MensajeEntrante): Promise<void> {
     return;
   }
 
-  // Si el usuario está completando su suscripción, esperamos su email.
+  // Flujo de suscripción: email → plan → link de pago.
   if (esperandoEmail(usuario)) {
     const respuesta = await procesarEmailSuscripcion(usuario, mensaje.texto);
+    await sendText(mensaje.phone, respuesta);
+    return;
+  }
+  if (esperandoPlan(usuario)) {
+    const respuesta = await procesarSeleccionPlan(usuario, mensaje.texto);
     await sendText(mensaje.phone, respuesta);
     return;
   }

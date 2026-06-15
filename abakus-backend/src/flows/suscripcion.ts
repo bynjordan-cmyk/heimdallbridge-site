@@ -1,20 +1,22 @@
 import { Usuario } from '../types';
 import { config } from '../config';
-import { crearSuscripcion, mpConfigurado } from '../pagos/mercadopago';
+import { crearSuscripcion, mpConfigurado, PlanAbakus } from '../pagos/mercadopago';
 import { updateUsuario } from '../supabase/queries';
+import { clp } from '../utils/format';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const ESTADO_ESPERANDO_EMAIL = 'esperando_email';
+const ESTADO_ESPERANDO_PLAN = 'esperando_plan';
 
 /**
  * Determina si el usuario tiene acceso para registrar movimientos.
- * Acceso si: es premium (pagó) o su prueba gratis sigue vigente.
+ * Acceso si: tiene plan de pago activo o su prueba gratis sigue vigente.
  *
  * Nota: si trial_ends_at es null (usuarios de n8n o previos a la migración),
  * NO se bloquea — evita dejar fuera a usuarios existentes.
  */
 export function accesoVigente(user: Usuario): boolean {
-  if (user.plan === 'premium') return true;
+  if (user.plan === 'basico' || user.plan === 'pro' || user.plan === 'premium') return true;
   if (!user.trial_ends_at) return true;
   return new Date(user.trial_ends_at).getTime() > Date.now();
 }
@@ -31,21 +33,27 @@ Para seguir registrando tus finanzas, activa tu plan escribiendo *suscribirme*.`
   return `${base}\n\n(La suscripción se activará muy pronto 🙌)`;
 }
 
-/** ¿El usuario está en medio del flujo de suscripción (esperando su email)? */
+/** ¿El usuario está esperando ingresar su email? */
 export function esperandoEmail(user: Usuario): boolean {
   return user.estado_conversacion === ESTADO_ESPERANDO_EMAIL;
 }
 
+/** ¿El usuario está esperando seleccionar su plan? */
+export function esperandoPlan(user: Usuario): boolean {
+  return user.estado_conversacion === ESTADO_ESPERANDO_PLAN;
+}
+
 /**
  * Inicia la suscripción cuando el usuario escribe "suscribirme".
- * - Si MP por API está configurado: pide el email (o usa el guardado) y crea el link.
+ * - Si MP por API está configurado: pide email (o usa el guardado) y luego el plan.
  * - Si solo hay link estático: lo envía.
  * - Si nada está configurado: mensaje de "próximamente".
  */
 export async function iniciarSuscripcion(user: Usuario): Promise<string> {
   if (mpConfigurado()) {
     if (user.email && EMAIL_RE.test(user.email)) {
-      return crearYEnviarLink(user.phone, user.email);
+      await updateUsuario(user.phone, { estado_conversacion: ESTADO_ESPERANDO_PLAN });
+      return mensajeSeleccionPlan();
     }
     await updateUsuario(user.phone, { estado_conversacion: ESTADO_ESPERANDO_EMAIL });
     return '¡Genial que quieras activar tu plan! 🙌\n\nPara generar tu pago seguro, ¿me confirmas tu *correo electrónico*?';
@@ -60,7 +68,6 @@ export async function iniciarSuscripcion(user: Usuario): Promise<string> {
 
 /**
  * Procesa el mensaje cuando el usuario está en estado "esperando_email".
- * Valida el correo, lo guarda y genera el link de pago.
  */
 export async function procesarEmailSuscripcion(user: Usuario, texto: string): Promise<string> {
   const email = texto.trim().toLowerCase();
@@ -69,13 +76,56 @@ export async function procesarEmailSuscripcion(user: Usuario, texto: string): Pr
     return 'Mmm, ese correo no parece válido 🤔 ¿Me lo escribes de nuevo? (ej: nombre@gmail.com)';
   }
 
-  await updateUsuario(user.phone, { email, estado_conversacion: null });
-  return crearYEnviarLink(user.phone, email);
+  await updateUsuario(user.phone, { email, estado_conversacion: ESTADO_ESPERANDO_PLAN });
+  return mensajeSeleccionPlan();
 }
 
-async function crearYEnviarLink(phone: string, email: string): Promise<string> {
-  const initPoint = await crearSuscripcion(phone, email);
-  return `💳 *Activa tu plan Abakus*
+/**
+ * Procesa la selección de plan cuando el usuario está en estado "esperando_plan".
+ */
+export async function procesarSeleccionPlan(user: Usuario, texto: string): Promise<string> {
+  const plan = detectarPlan(texto);
+
+  if (!plan) {
+    return `No reconocí tu elección 🤔 Responde *1* para Plan Básico o *2* para Plan Pro.`;
+  }
+
+  await updateUsuario(user.phone, { estado_conversacion: null });
+
+  const email = user.email ?? '';
+  return crearYEnviarLink(user.phone, email, plan);
+}
+
+function detectarPlan(texto: string): PlanAbakus | null {
+  const t = texto.trim().toLowerCase();
+  if (t === '1' || t === 'básico' || t === 'basico' || t === 'plan básico' || t === 'plan basico') {
+    return 'basico';
+  }
+  if (t === '2' || t === 'pro' || t === 'plan pro') {
+    return 'pro';
+  }
+  return null;
+}
+
+function mensajeSeleccionPlan(): string {
+  const precioBasico = clp(config.pago.precioBasico);
+  const precioPro = clp(config.pago.precioPro);
+
+  return `¡Perfecto! Elige tu plan:
+
+1️⃣ *Plan Básico* — ${precioBasico}/mes
+Registro ilimitado de ingresos, egresos y deudas. Resumen financiero mensual.
+
+2️⃣ *Plan Pro* — ${precioPro}/mes
+Todo el Plan Básico + funcionalidades avanzadas.
+
+Responde *1* para Básico o *2* para Pro.`;
+}
+
+async function crearYEnviarLink(phone: string, email: string, plan: PlanAbakus): Promise<string> {
+  const initPoint = await crearSuscripcion(phone, email, plan);
+  const nombrePlan = plan === 'pro' ? 'Pro' : 'Básico';
+  return `💳 *Activa tu Abakus Plan ${nombrePlan}*
 
 Listo, ${email}. Completa tu suscripción de forma segura aquí:
 ${initPoint}
