@@ -37,6 +37,42 @@ export function mesPasado(): Periodo {
   return buildPeriodo(anio, mes === 0 ? 12 : mes);
 }
 
+/** Período de N meses atrás respecto al actual. N negativo = meses adelante. */
+export function periodoMesesAtras(n: number): Periodo {
+  const hoy = new Date();
+  const fecha = new Date(hoy.getFullYear(), hoy.getMonth() - n, 1);
+  return buildPeriodo(fecha.getFullYear(), fecha.getMonth() + 1);
+}
+
+/** Diferencia en meses entre un período y el mes actual (positivo = futuro). */
+export function diferenciaMeses(periodo: Periodo): number {
+  const hoy = new Date();
+  const [anio, mes] = periodo.desde.split('-').map(Number);
+  return (anio - hoy.getFullYear()) * 12 + (mes - (hoy.getMonth() + 1));
+}
+
+/**
+ * Detecta un mes mencionado en el texto (sin asumir mes actual por defecto).
+ * Si el mes ya pasó este año y no se especifica año, asume el próximo año.
+ * Devuelve null si no se menciona ningún mes.
+ */
+export function parsearMesObjetivo(texto: string): Periodo | null {
+  const t = texto.toLowerCase();
+  const hoy = new Date();
+
+  for (const [nombre, num] of Object.entries(MESES)) {
+    if (t.includes(nombre)) {
+      const matchAnio = t.match(/\b(20\d{2})\b/);
+      let anio = matchAnio ? Number(matchAnio[1]) : hoy.getFullYear();
+      if (!matchAnio && num < hoy.getMonth() + 1) {
+        anio += 1;
+      }
+      return buildPeriodo(anio, num);
+    }
+  }
+  return null;
+}
+
 /**
  * Parsea el texto del usuario para detectar el período del reporte.
  * Soporta: "reporte", "reporte mayo", "reporte mayo 2025".

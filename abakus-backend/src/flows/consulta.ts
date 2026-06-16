@@ -1,9 +1,16 @@
 import { Movimiento, Usuario } from '../types';
 import { getCuentasPendientes, getMovimientosPeriodo, setMeta } from '../supabase/queries';
 import { clp } from '../utils/format';
-import { mesActual, mesPasado, parsearPeriodo } from '../reports/periodo';
+import {
+  diferenciaMeses,
+  mesActual,
+  mesPasado,
+  parsearMesObjetivo,
+  parsearPeriodo,
+  periodoMesesAtras,
+} from '../reports/periodo';
 
-export type ComandoEspecial = 'resumen' | 'cobros' | 'ayuda' | 'pago' | 'reporte' | 'eliminar' | 'comparar' | 'meta';
+export type ComandoEspecial = 'resumen' | 'cobros' | 'ayuda' | 'pago' | 'reporte' | 'eliminar' | 'comparar' | 'meta' | 'proyeccion';
 
 const MESES_ES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 const tieneMes = (s: string) => MESES_ES.some((m) => s.includes(m));
@@ -26,6 +33,7 @@ export function detectarComando(texto: string): ComandoEspecial | null {
   ) return 'reporte';
   if (t === 'deshacer' || t === 'undo' || t === 'borra el último' || t === 'borrar último' || t === 'eliminar último') return 'eliminar';
   if (t === 'comparar' || t === 'comparativo' || t === 'tendencia' || t.includes('vs el mes') || t.includes('mes pasado')) return 'comparar';
+  if (t.includes('proyec')) return 'proyeccion';
   if (t === 'meta' || t.startsWith('meta ') || t === 'objetivo' || t.startsWith('objetivo ') || t.startsWith('mi meta')) return 'meta';
   return null;
 }
@@ -33,12 +41,13 @@ export function detectarComando(texto: string): ComandoEspecial | null {
 const AYUDA = `🧮 *Abakus* — esto es lo que puedo hacer:
 
 • Registra natural: "vendí 50000 en diseño" o "pagué 12000 de luz".
-• *resumen* → balance del mes con desglose por categoría.
+• *resumen* → balance del mes con desglose por categoría y proyección de cierre.
 • *resumen mayo* → balance de cualquier mes anterior.
+• *proyección julio* → estimado de un mes futuro según tu historial.
 • *comparar* → este mes vs el mes pasado.
 • *cobros* → tus cuentas por cobrar activas.
 • *reporte* → Excel con detalle completo (o "reporte mayo").
-• *meta 1500000* → fija tu objetivo mensual de ingresos.
+• *meta 1500000* → fija tu objetivo mensual de ingresos (opcional).
 • "Juan me pagó" → marca la deuda como cobrada.
 • *deshacer* → borra el último movimiento registrado.
 • Cuéntame una deuda: "Juan me debe 30000 para el 30/06".
@@ -58,6 +67,10 @@ export async function handleComando(
 
   if (comando === 'meta') {
     return handleMeta(user, textoOriginal ?? '');
+  }
+
+  if (comando === 'proyeccion') {
+    return handleProyeccion(user, textoOriginal ?? '');
   }
 
   if (comando === 'comparar') {
@@ -114,6 +127,53 @@ async function handleMeta(user: Usuario, textoOriginal: string): Promise<string>
 
   await setMeta(user.phone, monto);
   return `🎯 ¡Meta mensual actualizada!\nObjetivo: *${clp(monto)}/mes*\n\nEscribe *resumen* para ver tu progreso. 💪`;
+}
+
+/**
+ * Proyección a un mes específico. Si el mes es el actual, usa el ritmo diario
+ * (igual que en el resumen). Si es futuro, promedia los últimos meses con
+ * datos. Si ya pasó, simplemente muestra el resumen real (no es proyección).
+ */
+async function handleProyeccion(user: Usuario, textoOriginal: string): Promise<string> {
+  const objetivo = parsearMesObjetivo(textoOriginal) ?? periodoMesesAtras(-1);
+  const delta = diferenciaMeses(objetivo);
+
+  if (delta < 0) {
+    const movs = await getMovimientosPeriodo(user.phone, objetivo.desde, objetivo.hasta);
+    return `_${objetivo.label} ya pasó, así que este es el resultado real (no una proyección):_\n\n${formatearResumen(movs, objetivo.label, false)}`;
+  }
+
+  if (delta === 0) {
+    const movs = await getMovimientosPeriodo(user.phone, objetivo.desde, objetivo.hasta);
+    return formatearResumen(movs, objetivo.label, true, user.meta_mensual);
+  }
+
+  // Mes futuro: promedio de los últimos 3 meses con movimientos.
+  const historico = await Promise.all(
+    [1, 2, 3].map(async (n) => {
+      const p = periodoMesesAtras(n);
+      const movs = await getMovimientosPeriodo(user.phone, p.desde, p.hasta);
+      return { p, movs };
+    }),
+  );
+
+  const conDatos = historico.filter((h) => h.movs.length > 0);
+  if (conDatos.length === 0) {
+    return `🔮 Aún no tengo suficiente historial para proyectar *${objetivo.label}*.\n\nSigue registrando tus ingresos y gastos este mes y la próxima vez podré estimarlo mejor. 📈`;
+  }
+
+  const sumaTipo = (tipo: 'ingreso' | 'egreso') =>
+    conDatos.reduce(
+      (acc, h) => acc + h.movs.filter((m) => m.tipo === tipo).reduce((s, m) => s + Number(m.monto), 0),
+      0,
+    );
+
+  const ingresosProy = Math.round(sumaTipo('ingreso') / conDatos.length);
+  const egresosProy = Math.round(sumaTipo('egreso') / conDatos.length);
+  const balanceProy = ingresosProy - egresosProy;
+  const signo = balanceProy >= 0 ? '+' : '-';
+
+  return `🔮 *Proyección para ${objetivo.label}*\n_(estimado según el promedio de tus últimos ${conDatos.length} mes${conDatos.length !== 1 ? 'es' : ''} con movimientos)_\n\n💰 Ingresos: ~${clp(ingresosProy)}\n💸 Egresos: ~${clp(egresosProy)}\n🧮 Balance: ${signo}${clp(Math.abs(balanceProy))}`;
 }
 
 async function handleComparativo(user: Usuario): Promise<string> {
