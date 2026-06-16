@@ -69,7 +69,7 @@ export async function handleComando(
     const esMesActual = !tieneMes(t);
     const periodo = esMesActual ? mesActual() : parsearPeriodo(t);
     const movs = await getMovimientosPeriodo(user.phone, periodo.desde, periodo.hasta);
-    return formatearResumen(movs, periodo.label, esMesActual ? user.meta_mensual : null);
+    return formatearResumen(movs, periodo.label, esMesActual, esMesActual ? user.meta_mensual : null);
   }
 
   // comando === 'cobros'
@@ -161,28 +161,38 @@ function progresoBarra(pct: number): string {
   return '█'.repeat(llenas) + '░'.repeat(5 - llenas);
 }
 
-export function formatearResumen(movs: Movimiento[], label: string, meta?: number | null): string {
+export function formatearResumen(
+  movs: Movimiento[],
+  label: string,
+  esMesActual = false,
+  meta?: number | null,
+): string {
   const ingresos = movs.filter((m) => m.tipo === 'ingreso').reduce((s, m) => s + Number(m.monto), 0);
   const egresos = movs.filter((m) => m.tipo === 'egreso').reduce((s, m) => s + Number(m.monto), 0);
   const balance = ingresos - egresos;
 
   let msg = `📊 *Resumen ${label}*\n💰 Ingresos: ${clp(ingresos)}\n💸 Egresos: ${clp(egresos)}\n🧮 Balance: ${balance >= 0 ? '' : '-'}${clp(Math.abs(balance))}`;
 
-  // Meta y proyección (solo cuando se pasa meta, es decir, mes actual)
-  if (meta) {
-    const pct = Math.round((ingresos / meta) * 100);
-    const barra = progresoBarra(pct);
-    msg += `\n\n🎯 *Meta:* ${clp(ingresos)} / ${clp(meta)} ${barra} ${pct}%`;
-
-    // Proyección basada en ritmo diario
+  // Proyección de cierre: siempre en el mes actual (no depende de meta).
+  if (esMesActual && ingresos > 0) {
     const hoy = new Date();
     const dia = hoy.getDate();
     const diasMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0).getDate();
-    if (dia > 0 && ingresos > 0) {
-      const proyeccion = Math.round((ingresos / dia) * diasMes);
-      const emojiProy = proyeccion >= meta ? '📈' : '📉';
-      msg += `\n${emojiProy} _Proyección al cierre: ~${clp(proyeccion)}_`;
+    if (dia < diasMes) {
+      const proyIngresos = Math.round((ingresos / dia) * diasMes);
+      const proyEgresos = Math.round((egresos / dia) * diasMes);
+      const proyBalance = proyIngresos - proyEgresos;
+      const signo = proyBalance >= 0 ? '+' : '-';
+      msg += `\n\n🔮 *Proyección al cierre del mes:*\n  💰 Ingresos: ~${clp(proyIngresos)}\n  💸 Egresos: ~${clp(proyEgresos)}\n  🧮 Balance: ${signo}${clp(Math.abs(proyBalance))}`;
     }
+  }
+
+  // Meta mensual: bloque opcional, solo si el usuario fijó una.
+  if (esMesActual && meta) {
+    const pct = Math.round((ingresos / meta) * 100);
+    const barra = progresoBarra(pct);
+    const emoji = ingresos >= meta ? '🎉' : '🎯';
+    msg += `\n\n${emoji} *Meta:* ${clp(ingresos)} / ${clp(meta)} ${barra} ${pct}%`;
   }
 
   // Desglose por categoría (solo egresos con categoría, top 5)

@@ -75,11 +75,18 @@ const TIPOS_VALIDOS: TipoInterpretacion[] = [
 
 const RESPUESTA_FALLBACK = 'No estoy seguro de haber entendido 🤔 ¿Me lo cuentas de otra forma?';
 
-export async function interpretar(texto: string): Promise<Interpretacion> {
+export async function interpretar(
+  texto: string,
+  contexto?: { nombre?: string | null },
+): Promise<Interpretacion> {
+  const dato = contexto?.nombre
+    ? `\n\nDATO DEL USUARIO: Su nombre es "${contexto.nombre}". Úsalo con naturalidad en tus respuestas y, si pregunta cómo se llama, díselo directamente.`
+    : '';
+
   const response = await client.messages.create({
     model: config.anthropic.model,
     max_tokens: 1024,
-    system: SYSTEM_PROMPT,
+    system: SYSTEM_PROMPT + dato,
     messages: [{ role: 'user', content: texto }],
     output_config: { format: { type: 'json_schema', schema: SCHEMA } },
   });

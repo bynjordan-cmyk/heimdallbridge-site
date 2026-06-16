@@ -123,12 +123,13 @@ async function procesar(mensaje: MensajeEntrante): Promise<void> {
     return;
   }
 
-  // Interpretación con Claude.
-  const interp = await interpretar(mensaje.texto);
+  // Interpretación con Claude (le pasamos el nombre conocido para que lo use).
+  const interp = await interpretar(mensaje.texto, { nombre: usuario.nombre });
 
-  // Persistir nombre si el usuario se presentó y aún no lo tenemos.
-  if (interp.nombre && !usuario.nombre) {
+  // Persistir nombre si el usuario lo declara o pide un apodo distinto al guardado.
+  if (interp.nombre && interp.nombre !== usuario.nombre) {
     await updateUsuario(usuario.phone, { nombre: interp.nombre });
+    usuario.nombre = interp.nombre;
   }
 
   // cobro y eliminar detectados por Claude también pasan por handleRegistro.
