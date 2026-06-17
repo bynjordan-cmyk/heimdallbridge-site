@@ -10,7 +10,7 @@ import {
   periodoMesesAtras,
 } from '../reports/periodo';
 
-export type ComandoEspecial = 'resumen' | 'cobros' | 'ayuda' | 'pago' | 'reporte' | 'eliminar' | 'comparar' | 'meta' | 'proyeccion';
+export type ComandoEspecial = 'resumen' | 'cobros' | 'ayuda' | 'pago' | 'reporte' | 'eliminar' | 'comparar' | 'meta' | 'proyeccion' | 'plantilla';
 
 const MESES_ES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 const tieneMes = (s: string) => MESES_ES.some((m) => s.includes(m));
@@ -35,6 +35,7 @@ export function detectarComando(texto: string): ComandoEspecial | null {
   if (t === 'comparar' || t === 'comparativo' || t === 'tendencia' || t.includes('vs el mes') || t.includes('mes pasado')) return 'comparar';
   if (t.includes('proyec')) return 'proyeccion';
   if (t === 'meta' || t.startsWith('meta ') || t === 'objetivo' || t.startsWith('objetivo ') || t.startsWith('mi meta')) return 'meta';
+  if (t === 'plantilla' || t === 'template' || t === 'formato') return 'plantilla';
   return null;
 }
 
@@ -51,6 +52,7 @@ const AYUDA = `🧮 *Abakus* — esto es lo que puedo hacer:
 • "Juan me pagó" → marca la deuda como cobrada.
 • *deshacer* → borra el último movimiento registrado.
 • Cuéntame una deuda: "Juan me debe 30000 para el 30/06".
+• *plantilla* → descarga un Excel para cargar varios movimientos de una vez. Complétalo y reenvíamelo por aquí.
 • *plan* o *suscribirme* → activa tu suscripción.
 
 ¿En qué te ayudo?`;
@@ -63,7 +65,7 @@ export async function handleComando(
   if (comando === 'ayuda') return AYUDA;
 
   // Manejados directamente en handler.ts
-  // 'pago', 'reporte', 'eliminar' → return early desde handler
+  // 'pago', 'reporte', 'eliminar', 'plantilla' → return early desde handler
 
   if (comando === 'meta') {
     return handleMeta(user, textoOriginal ?? '');

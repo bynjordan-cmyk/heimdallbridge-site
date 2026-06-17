@@ -75,6 +75,35 @@ export async function insertMovimiento(input: {
   return data as Movimiento;
 }
 
+/** Inserta movimientos en lote (carga masiva desde Excel). Se envían en lotes de 200. */
+export async function insertMovimientosMasivo(
+  userPhone: string,
+  movimientos: {
+    tipo: TipoMovimiento;
+    monto: number;
+    categoria: string | null;
+    descripcion: string | null;
+    fecha: string;
+  }[],
+): Promise<void> {
+  const CHUNK = 200;
+
+  for (let i = 0; i < movimientos.length; i += CHUNK) {
+    const lote = movimientos.slice(i, i + CHUNK).map((m) => ({
+      user_phone: userPhone,
+      tipo: m.tipo,
+      monto: m.monto,
+      categoria: m.categoria,
+      descripcion: m.descripcion,
+      fecha: m.fecha,
+      raw_message: 'Carga masiva (Excel)',
+    }));
+
+    const { error } = await supabase.from('movimientos').insert(lote);
+    if (error) throw error;
+  }
+}
+
 export async function insertCuentaPorCobrar(input: {
   userPhone: string;
   contraparte: string | null;

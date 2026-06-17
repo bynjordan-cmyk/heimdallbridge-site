@@ -31,6 +31,25 @@ export async function sendText(to: string, body: string): Promise<void> {
 }
 
 /**
+ * Descarga un media de WhatsApp por su media_id (URL temporal + bytes con auth).
+ */
+export async function downloadMedia(mediaId: string): Promise<Buffer> {
+  const { data: meta } = await axios.get<{ url: string }>(
+    `https://graph.facebook.com/${config.whatsapp.graphVersion}/${mediaId}`,
+    { headers: authHeaders(), timeout: 10_000 },
+  );
+
+  const { data } = await axios.get<ArrayBuffer>(meta.url, {
+    headers: authHeaders(),
+    responseType: 'arraybuffer',
+    timeout: 30_000,
+    maxContentLength: 20 * 1024 * 1024, // 20 MB
+  });
+
+  return Buffer.from(data);
+}
+
+/**
  * Sube un buffer como media a WhatsApp y devuelve el media_id.
  */
 async function uploadMedia(buffer: Buffer, filename: string, mimeType: string): Promise<string> {

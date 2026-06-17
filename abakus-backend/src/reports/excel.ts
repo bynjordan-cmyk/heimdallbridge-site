@@ -251,6 +251,66 @@ function agregarHojaMovimientos(wb: ExcelJS.Workbook, movimientos: Movimiento[],
   }
 }
 
+/** Plantilla descargable (.xlsx) para que el usuario complete y reenvíe por WhatsApp. */
+export async function generarPlantillaExcel(): Promise<Buffer> {
+  const wb = new ExcelJS.Workbook();
+  wb.creator = 'Abakus';
+  wb.created = new Date();
+
+  const ws = wb.addWorksheet('Movimientos');
+  ws.columns = [
+    { width: 14 },
+    { width: 12 },
+    { width: 16 },
+    { width: 22 },
+    { width: 36 },
+  ];
+
+  ws.mergeCells('A1:E1');
+  const t = ws.getCell('A1');
+  t.value = '🧮 ABAKUS — Plantilla de carga masiva';
+  t.font = cellFont(true, 'FFFFFF', 13);
+  t.fill = fillSolid(COLOR_HEADER);
+  t.alignment = { horizontal: 'center', vertical: 'middle' };
+  ws.getRow(1).height = 28;
+
+  ws.mergeCells('A2:E2');
+  const nota = ws.getCell('A2');
+  nota.value = 'Una fila por movimiento. Tipo: "ingreso" o "egreso". Fecha: DD/MM/AAAA. No borres los encabezados de la fila 3.';
+  nota.font = cellFont(false, '555555', 9);
+  nota.alignment = { horizontal: 'center', wrapText: true };
+  ws.getRow(2).height = 28;
+
+  const headers = ['Fecha', 'Tipo', 'Monto', 'Categoría', 'Descripción'];
+  const hRow = ws.addRow(headers);
+  hRow.eachCell((cell) => {
+    cell.font = cellFont(true, 'FFFFFF', 10);
+    cell.fill = fillSolid('2C3E6B');
+    cell.alignment = { horizontal: 'center' };
+    cell.border = border();
+  });
+  hRow.height = 20;
+
+  const ejemplos: [string, string, number, string, string][] = [
+    ['01/06/2026', 'ingreso', 80000, 'Diseño web', 'Proyecto landing page cliente X'],
+    ['02/06/2026', 'egreso', 15000, 'Internet', 'Pago mensual'],
+  ];
+
+  ejemplos.forEach(([fecha, tipo, monto, categoria, descripcion], i) => {
+    const row = ws.addRow([fecha, tipo, monto, categoria, descripcion]);
+    row.eachCell((cell, col) => {
+      cell.fill = fillSolid(i % 2 === 0 ? 'FFFFFF' : COLOR_ACCENT);
+      cell.border = border();
+      cell.font = cellFont(false, '888888', 10);
+      cell.alignment = { horizontal: col === 5 ? 'left' : 'center' };
+    });
+    row.height = 17;
+  });
+
+  const buf = await wb.xlsx.writeBuffer();
+  return Buffer.from(buf);
+}
+
 function agregarHojaCuentas(wb: ExcelJS.Workbook, cuentas: CuentaPorCobrar[]): void {
   const ws = wb.addWorksheet('Cuentas por Cobrar');
   ws.columns = [

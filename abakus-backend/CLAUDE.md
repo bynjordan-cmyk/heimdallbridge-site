@@ -109,7 +109,11 @@ abakus-backend/
 │   ├── flows/
 │   │   ├── onboarding.ts     # Usuario nuevo
 │   │   ├── registro.ts       # Ingreso/egreso/deuda
-│   │   └── consulta.ts       # Comandos especiales y consultas
+│   │   ├── consulta.ts       # Comandos especiales y consultas
+│   │   └── carga.ts          # Carga masiva por Excel + plantilla
+│   ├── reports/
+│   │   ├── excel.ts          # Reporte Excel + plantilla de carga masiva
+│   │   └── importExcel.ts    # Parser de Excel para carga masiva
 │   └── utils/
 │       ├── format.ts         # Formato CLP
 │       └── idempotency.ts    # Dedup de message_id
@@ -151,6 +155,26 @@ abakus-backend/
 - `resumen` / `saldo` → ingresos vs egresos del mes
 - `cobros` / `pendientes` → cuentas por cobrar pendientes
 - `ayuda` → menú de comandos
+- `plantilla` → envía un Excel (.xlsx) de plantilla para carga masiva
+
+### Carga masiva por Excel
+
+El usuario puede enviar un documento `.xlsx` por WhatsApp (mensaje tipo `document`)
+para registrar muchos ingresos/egresos de una sola vez:
+
+1. Meta entrega el mensaje con `type: "document"` y un `media_id`.
+2. `downloadMedia()` (`whatsapp/sender.ts`) resuelve la URL temporal del media y
+   descarga los bytes.
+3. `parsearMovimientosExcel()` (`reports/importExcel.ts`) detecta automáticamente
+   las columnas Fecha/Tipo/Monto/Categoría/Descripción (alias y orden flexibles,
+   busca el encabezado entre las primeras 10 filas) y devuelve `{ validos, errores }`
+   por fila — un archivo con filas inválidas no aborta el resto.
+4. `insertMovimientosMasivo()` (`supabase/queries.ts`) inserta los válidos en
+   lotes de 200.
+5. Se responde con un resumen (cantidad, ingresos/egresos totales, errores).
+
+Límite: 500 filas de datos por archivo. Solo se soporta `.xlsx` (no `.xls` ni CSV).
+Igual que ingreso/egreso, requiere `accesoVigente` (trial vigente o plan de pago).
 
 ## Comportamientos importantes
 

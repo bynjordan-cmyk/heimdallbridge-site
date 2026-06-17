@@ -8,6 +8,7 @@ import { handleOnboarding } from '../flows/onboarding';
 import { handleRegistro } from '../flows/registro';
 import { detectarComando, handleComando } from '../flows/consulta';
 import { handleReporte } from '../flows/reporte';
+import { handleCargaMasiva, handlePlantilla } from '../flows/carga';
 import {
   accesoVigente,
   esperandoEmail,
@@ -48,15 +49,35 @@ function extraerMensaje(body: WhatsAppWebhookBody): MensajeEntrante | null {
   const value = body?.entry?.[0]?.changes?.[0]?.value;
   const message = value?.messages?.[0];
 
-  if (!message || message.type !== 'text' || !message.text?.body) {
+  if (!message) return null;
+
+  const phone = normalizarTelefono(message.from);
+  const nombre = value?.contacts?.[0]?.profile?.name ?? null;
+
+  if (message.type === 'document' && message.document?.id) {
+    return {
+      phone,
+      texto: '',
+      messageId: message.id,
+      nombre,
+      documento: {
+        mediaId: message.document.id,
+        filename: message.document.filename ?? 'archivo.xlsx',
+        mimeType: message.document.mime_type ?? '',
+      },
+    };
+  }
+
+  if (message.type !== 'text' || !message.text?.body) {
     return null;
   }
 
   return {
-    phone: normalizarTelefono(message.from),
+    phone,
     texto: message.text.body,
     messageId: message.id,
-    nombre: value?.contacts?.[0]?.profile?.name ?? null,
+    nombre,
+    documento: null,
   };
 }
 
@@ -92,6 +113,18 @@ async function procesar(mensaje: MensajeEntrante): Promise<void> {
     return;
   }
 
+  // Carga masiva: el usuario envió un documento Excel.
+  if (mensaje.documento) {
+    if (!accesoVigente(usuario)) {
+      await sendText(mensaje.phone, mensajeTrialVencido());
+      return;
+    }
+    await sendText(mensaje.phone, '📥 Recibí tu archivo, procesando la carga masiva...');
+    const respuesta = await handleCargaMasiva(usuario, mensaje.documento);
+    await sendText(mensaje.phone, respuesta);
+    return;
+  }
+
   // Comandos especiales: no pasan por Claude.
   const comando = detectarComando(mensaje.texto);
   if (comando === 'pago') {
@@ -102,6 +135,10 @@ async function procesar(mensaje: MensajeEntrante): Promise<void> {
   if (comando === 'reporte') {
     await sendText(mensaje.phone, '📊 Generando tu reporte, un momento...');
     await handleReporte(usuario, mensaje.texto);
+    return;
+  }
+  if (comando === 'plantilla') {
+    await handlePlantilla(usuario);
     return;
   }
   if (comando === 'eliminar') {

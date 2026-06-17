@@ -59,11 +59,18 @@ export interface Interpretacion {
 
 // ===== Mensaje entrante ya normalizado =====
 
+export interface DocumentoEntrante {
+  mediaId: string;
+  filename: string;
+  mimeType: string;
+}
+
 export interface MensajeEntrante {
   phone: string; // normalizado: solo dígitos, sin '+'
   texto: string;
   messageId: string;
   nombre: string | null;
+  documento: DocumentoEntrante | null;
 }
 
 // ===== Tipos mínimos del payload de Meta WhatsApp Cloud API =====
@@ -97,4 +104,5 @@ export interface WhatsAppMessage {
   timestamp: string;
   type: string;
   text?: { body: string };
+  document?: { id: string; mime_type: string; filename?: string };
 }
