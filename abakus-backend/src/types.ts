@@ -48,7 +48,7 @@ export interface CuentaPorCobrar {
 
 // ===== Interpretación de Claude =====
 
-export type TipoInterpretacion = 'ingreso' | 'egreso' | 'consulta' | 'deuda' | 'cobro' | 'eliminar' | 'desconocido';
+export type TipoInterpretacion = 'ingreso' | 'egreso' | 'consulta' | 'deuda' | 'cobro' | 'eliminar' | 'corregir' | 'desconocido';
 
 export interface Interpretacion {
   tipo: TipoInterpretacion;

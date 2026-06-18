@@ -2,6 +2,7 @@ import { Interpretacion, Usuario } from '../types';
 import {
   contarCuentasPendientes,
   eliminarUltimoMovimiento,
+  actualizarUltimoMovimiento,
   insertCuentaPorCobrar,
   insertMovimiento,
   marcarCobrado,
@@ -26,6 +27,38 @@ export async function handleRegistro(
       return `Mmm, no encontré ninguna cuenta ${quien} activa 🤔 ¿Ya la habías marcado antes?`;
     }
     return `✅ ¡Cobro registrado!\n👤 ${cuenta.contraparte ?? 'Sin contraparte'} | ${clp(Number(cuenta.monto))} marcado como *pagado*. 🎉`;
+  }
+
+  // === Corregir último movimiento ===
+  if (interp.tipo === 'corregir') {
+    const res = await actualizarUltimoMovimiento(user.phone, {
+      monto: interp.monto ?? undefined,
+      categoria: interp.categoria ?? undefined,
+      descripcion: interp.descripcion ?? undefined,
+    });
+
+    if (!res) {
+      return 'No encontré un movimiento reciente para corregir 🤔 ¿Quieres registrar uno nuevo?';
+    }
+
+    const { anterior, actualizado } = res;
+    const cambios: string[] = [];
+    if (Number(anterior.monto) !== Number(actualizado.monto)) {
+      cambios.push(`💲 Monto: ${clp(Number(anterior.monto))} → *${clp(Number(actualizado.monto))}*`);
+    }
+    if ((anterior.categoria ?? '') !== (actualizado.categoria ?? '')) {
+      cambios.push(`🏷️ Categoría: ${anterior.categoria ?? '—'} → *${actualizado.categoria ?? '—'}*`);
+    }
+    if ((anterior.descripcion ?? '') !== (actualizado.descripcion ?? '')) {
+      cambios.push(`📝 Descripción: ${anterior.descripcion ?? '—'} → *${actualizado.descripcion ?? '—'}*`);
+    }
+
+    if (cambios.length === 0) {
+      return 'No detecté qué cambiar 🤔 Dime el nuevo valor, por ejemplo: "el monto eran 3000".';
+    }
+
+    const emoji = actualizado.tipo === 'ingreso' ? '💰' : '💸';
+    return `✏️ Movimiento corregido\n${emoji} ${actualizado.tipo === 'ingreso' ? 'Ingreso' : 'Egreso'}\n${cambios.join('\n')}`;
   }
 
   // === Eliminar último movimiento ===

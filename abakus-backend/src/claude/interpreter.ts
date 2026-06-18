@@ -13,11 +13,13 @@ TIPOS posibles:
 - "deuda": alguien le debe dinero al usuario (me debe, le presté, pendiente de cobro, queda debiendo...)
 - "cobro": alguien pagó una deuda que tenía con el usuario (me pagó, me saldó, ya cobré a, recibí el pago de...)
 - "eliminar": el usuario quiere borrar el último movimiento registrado (me equivoqué, borra el último, deshacer, undo, error...)
+- "corregir": el usuario quiere MODIFICAR el último movimiento que registró, no borrarlo (ej. "no, eran 3 mil", "modifica el monto a 5000", "lo pusiste mal, eran 2000", "cambia la categoría a transporte", "fueron solo 3mil"). Devuelve en monto/categoria/descripcion SOLO los valores corregidos; deja en null lo que no cambia.
 - "consulta": pregunta sobre sus datos, saludos, presentaciones de nombre, agradecimientos, o cualquier mensaje fuera de registro
 - "desconocido": el mensaje es ambiguo y necesita clarificación
 
 REGLAS:
 - Moneda CLP por defecto (Chile). Si dice "$50.000" o "50 mil" → monto = 50000.
+- "mil" en lenguaje coloquial chileno multiplica por 1000 SOLO cuando el número es chico: "3 mil"/"3mil" = 3000, "50 mil" = 50000. Pero si el número antes de "mil" ya es grande (≥1000), "mil" suele ser una muletilla y el monto es ese número tal cual: "3000 mil pesos" = 3000 (NO 3.000.000), "5000 mil" = 5000. Ante la duda, elige el monto más bajo y razonable.
 - No inventes datos: si no hay monto claro, monto = null.
 - Para "cobro": contraparte = quien pagó, monto = cuánto pagó (o null si no lo dice).
 - Para "eliminar" y "consulta" y "desconocido": todos los campos de dinero = null.
@@ -46,7 +48,7 @@ const SCHEMA = {
   properties: {
     tipo: {
       type: 'string',
-      enum: ['ingreso', 'egreso', 'consulta', 'deuda', 'cobro', 'eliminar', 'desconocido'],
+      enum: ['ingreso', 'egreso', 'consulta', 'deuda', 'cobro', 'eliminar', 'corregir', 'desconocido'],
     },
     nombre: { anyOf: [{ type: 'string' }, { type: 'null' }] },
     monto: { anyOf: [{ type: 'number' }, { type: 'null' }] },
@@ -82,6 +84,7 @@ const TIPOS_VALIDOS: TipoInterpretacion[] = [
   'deuda',
   'cobro',
   'eliminar',
+  'corregir',
   'desconocido',
 ];
 

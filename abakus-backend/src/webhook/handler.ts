@@ -1,9 +1,10 @@
 import { Request, Response } from 'express';
 import { Interpretacion, MensajeEntrante, Usuario, WhatsAppWebhookBody } from '../types';
 import { yaProcesado } from '../utils/idempotency';
-import { getUsuarioByPhone, updateUsuario, agregarAprendizaje } from '../supabase/queries';
+import { getUsuarioByPhone, updateUsuario, agregarAprendizaje, getUltimoMovimiento } from '../supabase/queries';
 import { interpretar } from '../claude/interpreter';
 import { construirPerfil } from '../aprendizaje/perfil';
+import { clp } from '../utils/format';
 import { sendText } from '../whatsapp/sender';
 import { handleOnboarding } from '../flows/onboarding';
 import { handleRegistro } from '../flows/registro';
@@ -161,16 +162,26 @@ async function procesar(mensaje: MensajeEntrante): Promise<void> {
     return;
   }
 
-  // Interpretación con Claude, alimentada con el perfil aprendido del usuario.
-  const perfil = await construirPerfil(usuario);
-  const interp = await interpretar(mensaje.texto, { nombre: usuario.nombre, perfil });
+  // Interpretación con Claude, alimentada con el perfil aprendido y el último
+  // movimiento (para que las correcciones sepan a qué se refieren).
+  const [perfil, ultimo] = await Promise.all([
+    construirPerfil(usuario),
+    getUltimoMovimiento(usuario.phone).catch(() => null),
+  ]);
+  const ctxUltimo = ultimo
+    ? `\n\nÚLTIMO MOVIMIENTO DEL USUARIO (úsalo si el mensaje corrige o se refiere a algo recién registrado): ${
+        ultimo.tipo
+      } de ${clp(Number(ultimo.monto))}${ultimo.categoria ? ` en "${ultimo.categoria}"` : ''}.`
+    : '';
+  const interp = await interpretar(mensaje.texto, { nombre: usuario.nombre, perfil: perfil + ctxUltimo });
 
   // Persistir lo que Abakus aprendió de este mensaje (nombre, negocio, tono, memoria).
   await persistirAprendizaje(usuario, interp);
 
-  // cobro y eliminar detectados por Claude también pasan por handleRegistro.
+  // cobro, eliminar y corregir detectados por Claude también pasan por handleRegistro.
   const esAccionDatos = interp.tipo === 'ingreso' || interp.tipo === 'egreso' ||
-    interp.tipo === 'deuda' || interp.tipo === 'cobro' || interp.tipo === 'eliminar';
+    interp.tipo === 'deuda' || interp.tipo === 'cobro' || interp.tipo === 'eliminar' ||
+    interp.tipo === 'corregir';
 
   // Candado de trial: solo bloquea nuevos registros (ingreso/egreso/deuda).
   const requiereAcceso = interp.tipo === 'ingreso' || interp.tipo === 'egreso' || interp.tipo === 'deuda';

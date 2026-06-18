@@ -357,6 +357,56 @@ export async function marcarRecordatorioEnviado(id: string): Promise<void> {
   if (error) throw error;
 }
 
+/** Devuelve el movimiento más reciente del usuario, o null si no hay. */
+export async function getUltimoMovimiento(userPhone: string): Promise<Movimiento | null> {
+  const { data, error } = await supabase
+    .from('movimientos')
+    .select('*')
+    .eq('user_phone', userPhone)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw error;
+  return (data as Movimiento | null) ?? null;
+}
+
+export interface MovimientoCorregido {
+  anterior: Movimiento;
+  actualizado: Movimiento;
+}
+
+/**
+ * Actualiza el movimiento más reciente del usuario con los cambios indicados
+ * (solo los campos no-undefined). Devuelve el antes/después, o null si no había
+ * ningún movimiento.
+ */
+export async function actualizarUltimoMovimiento(
+  userPhone: string,
+  cambios: Partial<Pick<Movimiento, 'tipo' | 'monto' | 'categoria' | 'descripcion'>>,
+): Promise<MovimientoCorregido | null> {
+  const anterior = await getUltimoMovimiento(userPhone);
+  if (!anterior) return null;
+
+  const limpio = Object.fromEntries(
+    Object.entries(cambios).filter(([, v]) => v !== undefined && v !== null),
+  );
+
+  if (Object.keys(limpio).length === 0) {
+    return { anterior, actualizado: anterior };
+  }
+
+  const { data, error } = await supabase
+    .from('movimientos')
+    .update(limpio)
+    .eq('id', anterior.id)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return { anterior, actualizado: data as Movimiento };
+}
+
 /**
  * Elimina el movimiento más reciente del usuario.
  * Devuelve el movimiento eliminado, o null si no había ninguno.

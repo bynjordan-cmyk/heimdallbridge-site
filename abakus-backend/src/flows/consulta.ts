@@ -50,6 +50,7 @@ const AYUDA = `🧮 *Abakus* — esto es lo que puedo hacer:
 • *reporte* → Excel con detalle completo (o "reporte mayo").
 • *meta 1500000* → fija tu objetivo mensual de ingresos (opcional).
 • "Juan me pagó" → marca la deuda como cobrada.
+• Corrige sobre la marcha: "no, eran 3000" o "cambia la categoría a transporte" → ajusta el último movimiento.
 • *deshacer* → borra el último movimiento registrado.
 • Cuéntame una deuda: "Juan me debe 30000 para el 30/06".
 • *plantilla* → descarga un Excel para cargar varios movimientos de una vez. Complétalo y reenvíamelo por aquí.

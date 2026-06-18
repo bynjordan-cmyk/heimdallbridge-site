@@ -167,13 +167,19 @@ abakus-backend/
 6. **Usuario existe → Claude** — `claude-haiku-4-5` con structured outputs (`output_config.format`) devuelve:
    ```json
    {
-     "tipo": "ingreso|egreso|consulta|deuda|desconocido",
+     "tipo": "ingreso|egreso|consulta|deuda|cobro|eliminar|corregir|desconocido",
      "monto": number|null, "categoria": string|null, "descripcion": string|null,
      "contraparte": string|null, "fecha_vencimiento": "YYYY-MM-DD"|null,
-     "respuesta": string
+     "respuesta": string,
+     "negocio": string|null, "tono": string|null, "aprendizaje": string|null
    }
    ```
-7. **Guardar en Supabase** — ingreso/egreso → `movimientos`; deuda → `cuentas_por_cobrar`; consulta → no guarda.
+   Antes de llamar a Claude se le inyecta el perfil del usuario y el **último
+   movimiento** registrado, para que las correcciones sepan a qué se refieren.
+7. **Guardar en Supabase** — ingreso/egreso → `movimientos`; deuda → `cuentas_pendientes`;
+   `cobro` → marca cuenta pagada; `eliminar` → borra el último movimiento;
+   `corregir` → actualiza el último movimiento (monto/categoría/descripción);
+   consulta → no guarda.
 8. **Responder por WhatsApp** — `POST graph.facebook.com/v22.0/{PHONE_NUMBER_ID}/messages`.
 
 ### Respuestas de confirmación
