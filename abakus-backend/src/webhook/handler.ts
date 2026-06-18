@@ -1,8 +1,9 @@
 import { Request, Response } from 'express';
-import { MensajeEntrante, WhatsAppWebhookBody } from '../types';
+import { Interpretacion, MensajeEntrante, Usuario, WhatsAppWebhookBody } from '../types';
 import { yaProcesado } from '../utils/idempotency';
-import { getUsuarioByPhone, updateUsuario } from '../supabase/queries';
+import { getUsuarioByPhone, updateUsuario, agregarAprendizaje } from '../supabase/queries';
 import { interpretar } from '../claude/interpreter';
+import { construirPerfil } from '../aprendizaje/perfil';
 import { sendText } from '../whatsapp/sender';
 import { handleOnboarding } from '../flows/onboarding';
 import { handleRegistro } from '../flows/registro';
@@ -160,14 +161,12 @@ async function procesar(mensaje: MensajeEntrante): Promise<void> {
     return;
   }
 
-  // Interpretación con Claude (le pasamos el nombre conocido para que lo use).
-  const interp = await interpretar(mensaje.texto, { nombre: usuario.nombre });
+  // Interpretación con Claude, alimentada con el perfil aprendido del usuario.
+  const perfil = await construirPerfil(usuario);
+  const interp = await interpretar(mensaje.texto, { nombre: usuario.nombre, perfil });
 
-  // Persistir nombre si el usuario lo declara o pide un apodo distinto al guardado.
-  if (interp.nombre && interp.nombre !== usuario.nombre) {
-    await updateUsuario(usuario.phone, { nombre: interp.nombre });
-    usuario.nombre = interp.nombre;
-  }
+  // Persistir lo que Abakus aprendió de este mensaje (nombre, negocio, tono, memoria).
+  await persistirAprendizaje(usuario, interp);
 
   // cobro y eliminar detectados por Claude también pasan por handleRegistro.
   const esAccionDatos = interp.tipo === 'ingreso' || interp.tipo === 'egreso' ||
@@ -189,4 +188,38 @@ async function procesar(mensaje: MensajeEntrante): Promise<void> {
   }
 
   await sendText(mensaje.phone, respuesta);
+}
+
+/**
+ * Guarda lo que Abakus aprendió del usuario en este mensaje: nombre, negocio y
+ * tono (campos directos de `usuarios`) y memoria explícita (lista de datos
+ * durables). Nunca rompe el flujo principal: los errores se loguean y se ignoran
+ * (ej. si aún no existe la columna `memoria` en la DB).
+ */
+async function persistirAprendizaje(usuario: Usuario, interp: Interpretacion): Promise<void> {
+  const campos: Partial<Pick<Usuario, 'nombre' | 'negocio' | 'tono'>> = {};
+
+  if (interp.nombre && interp.nombre !== usuario.nombre) {
+    campos.nombre = interp.nombre;
+    usuario.nombre = interp.nombre;
+  }
+  if (interp.negocio && interp.negocio !== usuario.negocio) {
+    campos.negocio = interp.negocio;
+    usuario.negocio = interp.negocio;
+  }
+  if (interp.tono && interp.tono !== usuario.tono) {
+    campos.tono = interp.tono;
+    usuario.tono = interp.tono;
+  }
+
+  try {
+    if (Object.keys(campos).length > 0) {
+      await updateUsuario(usuario.phone, campos);
+    }
+    if (interp.aprendizaje) {
+      await agregarAprendizaje(usuario.phone, interp.aprendizaje);
+    }
+  } catch (err) {
+    console.error('[abakus][aprendizaje] No se pudo persistir el aprendizaje:', err);
+  }
 }

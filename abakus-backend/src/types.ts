@@ -13,6 +13,10 @@ export interface Usuario {
   email: string | null;
   estado_conversacion: string | null;
   meta_mensual: number | null;
+  // Memoria explícita: datos durables que el usuario ha mencionado y que
+  // Abakus recuerda para personalizar futuras conversaciones.
+  // Requiere columna `memoria jsonb DEFAULT '[]'` en la tabla usuarios.
+  memoria: string[] | null;
   created_at: string;
 }
 
@@ -55,6 +59,10 @@ export interface Interpretacion {
   contraparte: string | null;
   fecha_vencimiento: string | null;
   respuesta: string;
+  // ===== Aprendizaje: datos que Claude extrae para recordar =====
+  negocio: string | null;      // a qué se dedica el usuario, si lo revela
+  tono: string | null;         // preferencia de estilo, si la pide explícitamente
+  aprendizaje: string | null;  // dato durable nuevo a recordar (o null)
 }
 
 // ===== Mensaje entrante ya normalizado =====

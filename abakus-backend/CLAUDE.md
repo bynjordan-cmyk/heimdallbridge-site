@@ -88,6 +88,36 @@ created_at        timestamptz DEFAULT now()
 > agregar esa columna a las tablas. Mientras no exista, las queries NO filtran
 > por `deleted_at` (los flujos v1 no borran registros).
 
+> **Migración requerida para aprendizaje (memoria explícita):** la tabla
+> `usuarios` necesita una columna `memoria jsonb DEFAULT '[]'::jsonb`. Los
+> campos `negocio` y `tono` ya existen en el esquema real. El código degrada
+> con gracia si `memoria` aún no existe (loguea el error y sigue), pero la
+> memoria explícita no se persistirá hasta crear la columna:
+> ```sql
+> ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS memoria jsonb DEFAULT '[]'::jsonb;
+> ```
+
+## Aprendizaje del usuario (`src/aprendizaje/perfil.ts`)
+
+Abakus personaliza la interpretación de Claude con un "perfil" del usuario que
+se inyecta en el system prompt en cada mensaje que pasa por Claude:
+
+1. **Categorías frecuentes** — `getCategoriasFrecuentes` mira los movimientos
+   recientes; Claude reutiliza una categoría existente en vez de inventar
+   sinónimos ("Internet" en vez de crear "Wifi").
+2. **Contrapartes frecuentes** — `getContrapartesFrecuentes` desde
+   `cuentas_pendientes`.
+3. **Negocio y tono** — campos `negocio`/`tono` de `usuarios`. Claude los
+   **extrae** automáticamente cuando el usuario los revela ("soy diseñador",
+   "háblame más formal") y se persisten.
+4. **Memoria explícita** — Claude devuelve un campo `aprendizaje` con datos
+   durables ("trabajo con boleta de honorarios", "mi socio es Pedro"), que se
+   guardan en `usuarios.memoria` (dedup, tope 20, FIFO) vía `agregarAprendizaje`.
+
+La interpretación (`claude/interpreter.ts`) devuelve 3 campos extra además de
+los de registro: `negocio`, `tono`, `aprendizaje`. La persistencia ocurre en
+`persistirAprendizaje` (handler), que nunca rompe el flujo principal.
+
 ## Estructura de archivos (este directorio)
 
 ```
@@ -111,6 +141,8 @@ abakus-backend/
 │   │   ├── registro.ts       # Ingreso/egreso/deuda
 │   │   ├── consulta.ts       # Comandos especiales y consultas
 │   │   └── carga.ts          # Carga masiva por Excel + plantilla
+│   ├── aprendizaje/
+│   │   └── perfil.ts         # Perfil del usuario inyectado a Claude
 │   ├── reports/
 │   │   ├── excel.ts          # Reporte Excel + plantilla de carga masiva
 │   │   └── importExcel.ts    # Parser de Excel para carga masiva

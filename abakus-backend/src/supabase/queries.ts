@@ -26,10 +26,90 @@ export async function createUsuario(phone: string, nombre: string | null): Promi
 /** Actualiza campos arbitrarios del usuario por teléfono. */
 export async function updateUsuario(
   phone: string,
-  campos: Partial<Pick<Usuario, 'nombre' | 'email' | 'estado_conversacion' | 'plan' | 'activo'>>,
+  campos: Partial<
+    Pick<Usuario, 'nombre' | 'email' | 'estado_conversacion' | 'plan' | 'activo' | 'negocio' | 'tono' | 'memoria'>
+  >,
 ): Promise<void> {
   const { error } = await supabase.from('usuarios').update(campos).eq('phone', phone);
   if (error) throw error;
+}
+
+/**
+ * Categorías que el usuario ya ha usado, ordenadas por frecuencia (más usada
+ * primero). Mira sus movimientos recientes para alimentar el aprendizaje de
+ * categorías de Claude.
+ */
+export async function getCategoriasFrecuentes(userPhone: string, limite = 12): Promise<string[]> {
+  const { data, error } = await supabase
+    .from('movimientos')
+    .select('categoria')
+    .eq('user_phone', userPhone)
+    .not('categoria', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(300);
+
+  if (error) throw error;
+  return topPorFrecuencia((data ?? []).map((r) => (r as { categoria: string | null }).categoria), limite);
+}
+
+/** Contrapartes con las que el usuario ha tenido cuentas por cobrar, por frecuencia. */
+export async function getContrapartesFrecuentes(userPhone: string, limite = 8): Promise<string[]> {
+  const { data, error } = await supabase
+    .from('cuentas_pendientes')
+    .select('contraparte')
+    .eq('user_phone', userPhone)
+    .not('contraparte', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(200);
+
+  if (error) throw error;
+  return topPorFrecuencia((data ?? []).map((r) => (r as { contraparte: string | null }).contraparte), limite);
+}
+
+function topPorFrecuencia(valores: (string | null)[], limite: number): string[] {
+  const counts = new Map<string, number>();
+  for (const v of valores) {
+    const c = (v ?? '').trim();
+    if (!c) continue;
+    counts.set(c, (counts.get(c) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limite)
+    .map(([c]) => c);
+}
+
+/**
+ * Agrega un dato durable a la memoria del usuario (dedup case-insensitive,
+ * tope de MAX_MEMORIA entradas, FIFO). Requiere la columna `memoria jsonb`.
+ */
+const MAX_MEMORIA = 20;
+
+export async function agregarAprendizaje(userPhone: string, fact: string): Promise<void> {
+  const limpio = fact.trim();
+  if (!limpio) return;
+
+  const { data, error } = await supabase
+    .from('usuarios')
+    .select('memoria')
+    .eq('phone', userPhone)
+    .maybeSingle();
+
+  if (error) throw error;
+
+  const actual = Array.isArray((data as { memoria?: unknown } | null)?.memoria)
+    ? ((data as { memoria: string[] }).memoria)
+    : [];
+
+  if (actual.some((m) => m.toLowerCase() === limpio.toLowerCase())) return;
+
+  const nueva = [...actual, limpio].slice(-MAX_MEMORIA);
+
+  const { error: upError } = await supabase
+    .from('usuarios')
+    .update({ memoria: nueva })
+    .eq('phone', userPhone);
+  if (upError) throw upError;
 }
 
 /** Guarda o actualiza la meta mensual de ingresos del usuario. */

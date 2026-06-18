@@ -32,7 +32,13 @@ ESTILO de respuesta según tipo:
 - cobro: confirma que vas a marcar como cobrada. Ej: "¡Excelente! 🎉 Marcando el pago de [contraparte] como cobrado."
 - eliminar: confirma que vas a borrar. Ej: "Entendido, borrando el último movimiento registrado. 🗑️"
 - consulta (saludo, nombre, gracias, preguntas generales): responde amigable, ofrécete a ayudar con ingresos y gastos.
-- desconocido: pide clarificación con un ejemplo. Ej: "Mmm, no entendí bien 🤔 ¿Me dices si fue un ingreso o un gasto? Por ejemplo: 'cobré 30000 por una asesoría'"`;
+- desconocido: pide clarificación con un ejemplo. Ej: "Mmm, no entendí bien 🤔 ¿Me dices si fue un ingreso o un gasto? Por ejemplo: 'cobré 30000 por una asesoría'"
+
+APRENDIZAJE DEL USUARIO (campos extra que debes devolver siempre):
+- Si en el contexto recibes un PERFIL DEL USUARIO, úsalo para clasificar y responder mejor. En especial, REUTILIZA una categoría que el usuario ya use si el movimiento calza con ella (no inventes un sinónimo: si ya usa "Internet", no crees "Wifi"). Crea una categoría nueva solo si ninguna existente aplica.
+- "negocio": si el usuario revela a qué se dedica (ej. "soy diseñador freelance", "tengo un food truck", "vendo ropa"), devuélvelo en una frase corta. Si no lo revela, negocio = null.
+- "tono": SOLO si el usuario pide explícitamente cómo hablarle (ej. "háblame más formal", "trátame de tú", "usa menos emojis"), devuélvelo como una breve instrucción. Si no lo pide, tono = null.
+- "aprendizaje": si el usuario menciona un dato durable y útil para el futuro (ej. "trabajo con boleta de honorarios", "mi socio es Pedro", "cierro el mes el día 25"), devuélvelo como una frase corta. Si no hay nada nuevo que valga la pena recordar, o si el dato ya está en la memoria del perfil, aprendizaje = null. No guardes montos puntuales ni cosas efímeras.`;
 
 // JSON Schema escrito a mano para structured outputs.
 const SCHEMA = {
@@ -49,6 +55,9 @@ const SCHEMA = {
     contraparte: { anyOf: [{ type: 'string' }, { type: 'null' }] },
     fecha_vencimiento: { anyOf: [{ type: 'string' }, { type: 'null' }] },
     respuesta: { type: 'string' },
+    negocio: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+    tono: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+    aprendizaje: { anyOf: [{ type: 'string' }, { type: 'null' }] },
   },
   required: [
     'tipo',
@@ -59,6 +68,9 @@ const SCHEMA = {
     'contraparte',
     'fecha_vencimiento',
     'respuesta',
+    'negocio',
+    'tono',
+    'aprendizaje',
   ],
   additionalProperties: false,
 } as const;
@@ -77,16 +89,18 @@ const RESPUESTA_FALLBACK = 'No estoy seguro de haber entendido 🤔 ¿Me lo cuen
 
 export async function interpretar(
   texto: string,
-  contexto?: { nombre?: string | null },
+  contexto?: { nombre?: string | null; perfil?: string },
 ): Promise<Interpretacion> {
   const dato = contexto?.nombre
     ? `\n\nDATO DEL USUARIO: Su nombre es "${contexto.nombre}". Úsalo con naturalidad en tus respuestas y, si pregunta cómo se llama, díselo directamente.`
     : '';
 
+  const perfil = contexto?.perfil ?? '';
+
   const response = await client.messages.create({
     model: config.anthropic.model,
     max_tokens: 1024,
-    system: SYSTEM_PROMPT + dato,
+    system: SYSTEM_PROMPT + dato + perfil,
     messages: [{ role: 'user', content: texto }],
     output_config: { format: { type: 'json_schema', schema: SCHEMA } },
   });
@@ -123,5 +137,13 @@ function normalizar(raw: string): Interpretacion {
       typeof parsed.respuesta === 'string' && parsed.respuesta.trim().length > 0
         ? parsed.respuesta
         : RESPUESTA_FALLBACK,
+    negocio: textoLimpio(parsed.negocio),
+    tono: textoLimpio(parsed.tono),
+    aprendizaje: textoLimpio(parsed.aprendizaje),
   };
+}
+
+/** Devuelve el string recortado si tiene contenido, o null. */
+function textoLimpio(valor: unknown): string | null {
+  return typeof valor === 'string' && valor.trim().length > 0 ? valor.trim() : null;
 }
