@@ -193,6 +193,7 @@ function agregarHojaResumen(
 function agregarHojaMovimientos(wb: ExcelJS.Workbook, movimientos: Movimiento[], periodo: Periodo): void {
   const ws = wb.addWorksheet('Movimientos');
   ws.columns = [
+    { key: 'num', width: 8 },
     { key: 'fecha', width: 12 },
     { key: 'tipo', width: 12 },
     { key: 'monto', width: 18 },
@@ -201,7 +202,7 @@ function agregarHojaMovimientos(wb: ExcelJS.Workbook, movimientos: Movimiento[],
   ];
 
   // Título
-  ws.mergeCells('A1:E1');
+  ws.mergeCells('A1:F1');
   const t = ws.getCell('A1');
   t.value = `Detalle de Movimientos — ${periodo.label}`;
   t.font = cellFont(true, 'FFFFFF', 13);
@@ -210,7 +211,7 @@ function agregarHojaMovimientos(wb: ExcelJS.Workbook, movimientos: Movimiento[],
   ws.getRow(1).height = 28;
 
   // Encabezados
-  const headers = ['Fecha', 'Tipo', 'Monto', 'Categoría', 'Descripción'];
+  const headers = ['#', 'Fecha', 'Tipo', 'Monto', 'Categoría', 'Descripción'];
   const hRow = ws.addRow(headers);
   hRow.eachCell((cell) => {
     cell.font = cellFont(true, 'FFFFFF', 10);
@@ -224,6 +225,7 @@ function agregarHojaMovimientos(wb: ExcelJS.Workbook, movimientos: Movimiento[],
   sorted.forEach((m, i) => {
     const esIngreso = m.tipo === 'ingreso';
     const row = ws.addRow([
+      m.correlativo != null ? `#${m.correlativo}` : '—',
       fechaStr(m.fecha),
       esIngreso ? '💰 Ingreso' : '💸 Egreso',
       clpStr(Number(m.monto)),
@@ -233,9 +235,11 @@ function agregarHojaMovimientos(wb: ExcelJS.Workbook, movimientos: Movimiento[],
     row.eachCell((cell, col) => {
       cell.fill = fillSolid(i % 2 === 0 ? 'FFFFFF' : COLOR_ACCENT);
       cell.border = border();
-      cell.alignment = { horizontal: col === 5 ? 'left' : 'center', wrapText: col === 5 };
-      if (col === 3) {
+      cell.alignment = { horizontal: col === 6 ? 'left' : 'center', wrapText: col === 6 };
+      if (col === 4) {
         cell.font = cellFont(true, esIngreso ? COLOR_INCOME : COLOR_EXPENSE, 10);
+      } else if (col === 1) {
+        cell.font = cellFont(true, '888888', 10);
       } else {
         cell.font = cellFont(false, '333333', 10);
       }
@@ -244,8 +248,8 @@ function agregarHojaMovimientos(wb: ExcelJS.Workbook, movimientos: Movimiento[],
   });
 
   if (movimientos.length === 0) {
-    const empty = ws.addRow(['Sin movimientos en este período.', '', '', '', '']);
-    ws.mergeCells(`A${empty.number}:E${empty.number}`);
+    const empty = ws.addRow(['Sin movimientos en este período.', '', '', '', '', '']);
+    ws.mergeCells(`A${empty.number}:F${empty.number}`);
     empty.getCell(1).alignment = { horizontal: 'center' };
     empty.getCell(1).font = cellFont(false, '999999', 10);
   }

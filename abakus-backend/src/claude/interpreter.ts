@@ -13,13 +13,14 @@ TIPOS posibles:
 - "deuda": alguien le debe dinero al usuario (me debe, le presté, pendiente de cobro, queda debiendo...)
 - "cobro": alguien pagó una deuda que tenía con el usuario (me pagó, me saldó, ya cobré a, recibí el pago de...)
 - "eliminar": el usuario quiere borrar el último movimiento registrado (me equivoqué, borra el último, deshacer, undo, error...)
-- "corregir": el usuario quiere MODIFICAR el último movimiento que registró, no borrarlo (ej. "no, eran 3 mil", "modifica el monto a 5000", "lo pusiste mal, eran 2000", "cambia la categoría a transporte", "fueron solo 3mil"). Devuelve en monto/categoria/descripcion SOLO los valores corregidos; deja en null lo que no cambia.
+- "corregir": el usuario quiere MODIFICAR un movimiento que registró, no borrarlo (ej. "no, eran 3 mil", "modifica el monto a 5000", "lo pusiste mal, eran 2000", "cambia la categoría a transporte", "fueron solo 3mil", "corrige el #5 a 2000"). Devuelve en monto/categoria/descripcion SOLO los valores corregidos; deja en null lo que no cambia.
 - "consulta": pregunta sobre sus datos, saludos, presentaciones de nombre, agradecimientos, o cualquier mensaje fuera de registro
 - "desconocido": el mensaje es ambiguo y necesita clarificación
 
 REGLAS:
 - Moneda CLP por defecto (Chile). Si dice "$50.000" o "50 mil" → monto = 50000.
 - "mil" en lenguaje coloquial chileno multiplica por 1000 SOLO cuando el número es chico: "3 mil"/"3mil" = 3000, "50 mil" = 50000. Pero si el número antes de "mil" ya es grande (≥1000), "mil" suele ser una muletilla y el monto es ese número tal cual: "3000 mil pesos" = 3000 (NO 3.000.000), "5000 mil" = 5000. Ante la duda, elige el monto más bajo y razonable.
+- "referencia": si el usuario menciona el NÚMERO de un movimiento para corregir o borrar (ej. "el #5", "el movimiento 5", "corrige el 3", "borra el número 7"), pon ese entero en "referencia". OJO: esto es el identificador del movimiento, NO confundir con el monto. Si no menciona un número de movimiento (se refiere al último o a ninguno), referencia = null.
 - No inventes datos: si no hay monto claro, monto = null.
 - Para "cobro": contraparte = quien pagó, monto = cuánto pagó (o null si no lo dice).
 - Para "eliminar" y "consulta" y "desconocido": todos los campos de dinero = null.
@@ -57,6 +58,7 @@ const SCHEMA = {
     contraparte: { anyOf: [{ type: 'string' }, { type: 'null' }] },
     fecha_vencimiento: { anyOf: [{ type: 'string' }, { type: 'null' }] },
     respuesta: { type: 'string' },
+    referencia: { anyOf: [{ type: 'number' }, { type: 'null' }] },
     negocio: { anyOf: [{ type: 'string' }, { type: 'null' }] },
     tono: { anyOf: [{ type: 'string' }, { type: 'null' }] },
     aprendizaje: { anyOf: [{ type: 'string' }, { type: 'null' }] },
@@ -70,6 +72,7 @@ const SCHEMA = {
     'contraparte',
     'fecha_vencimiento',
     'respuesta',
+    'referencia',
     'negocio',
     'tono',
     'aprendizaje',
@@ -140,6 +143,10 @@ function normalizar(raw: string): Interpretacion {
       typeof parsed.respuesta === 'string' && parsed.respuesta.trim().length > 0
         ? parsed.respuesta
         : RESPUESTA_FALLBACK,
+    referencia:
+      typeof parsed.referencia === 'number' && Number.isFinite(parsed.referencia)
+        ? Math.trunc(parsed.referencia)
+        : null,
     negocio: textoLimpio(parsed.negocio),
     tono: textoLimpio(parsed.tono),
     aprendizaje: textoLimpio(parsed.aprendizaje),

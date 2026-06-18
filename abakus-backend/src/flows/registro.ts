@@ -1,13 +1,18 @@
 import { Interpretacion, Usuario } from '../types';
 import {
   contarCuentasPendientes,
-  eliminarUltimoMovimiento,
-  actualizarUltimoMovimiento,
+  eliminarMovimiento,
+  actualizarMovimiento,
   insertCuentaPorCobrar,
   insertMovimiento,
   marcarCobrado,
   getMovimientosPeriodo,
 } from '../supabase/queries';
+
+/** Etiqueta de correlativo, ej. " #42" (vacío si aún no hay numeración). */
+function refTag(correlativo: number | null): string {
+  return correlativo != null ? ` #${correlativo}` : '';
+}
 import { clp } from '../utils/format';
 import { mesActual } from '../reports/periodo';
 
@@ -29,16 +34,18 @@ export async function handleRegistro(
     return `✅ ¡Cobro registrado!\n👤 ${cuenta.contraparte ?? 'Sin contraparte'} | ${clp(Number(cuenta.monto))} marcado como *pagado*. 🎉`;
   }
 
-  // === Corregir último movimiento ===
+  // === Corregir un movimiento (por #referencia o el último) ===
   if (interp.tipo === 'corregir') {
-    const res = await actualizarUltimoMovimiento(user.phone, {
+    const res = await actualizarMovimiento(user.phone, interp.referencia, {
       monto: interp.monto ?? undefined,
       categoria: interp.categoria ?? undefined,
       descripcion: interp.descripcion ?? undefined,
     });
 
     if (!res) {
-      return 'No encontré un movimiento reciente para corregir 🤔 ¿Quieres registrar uno nuevo?';
+      return interp.referencia != null
+        ? `No encontré el movimiento #${interp.referencia} 🤔`
+        : 'No encontré un movimiento reciente para corregir 🤔 ¿Quieres registrar uno nuevo?';
     }
 
     const { anterior, actualizado } = res;
@@ -58,20 +65,24 @@ export async function handleRegistro(
     }
 
     const emoji = actualizado.tipo === 'ingreso' ? '💰' : '💸';
-    return `✏️ Movimiento corregido\n${emoji} ${actualizado.tipo === 'ingreso' ? 'Ingreso' : 'Egreso'}\n${cambios.join('\n')}`;
+    return `✏️ Movimiento${refTag(actualizado.correlativo)} corregido\n${emoji} ${
+      actualizado.tipo === 'ingreso' ? 'Ingreso' : 'Egreso'
+    }\n${cambios.join('\n')}`;
   }
 
-  // === Eliminar último movimiento ===
+  // === Eliminar un movimiento (por #referencia o el último) ===
   if (interp.tipo === 'eliminar') {
-    const mov = await eliminarUltimoMovimiento(user.phone);
+    const mov = await eliminarMovimiento(user.phone, interp.referencia);
     if (!mov) {
-      return 'No encontré movimientos recientes para borrar 🤔';
+      return interp.referencia != null
+        ? `No encontré el movimiento #${interp.referencia} 🤔`
+        : 'No encontré movimientos recientes para borrar 🤔';
     }
     const detalle = [clp(Number(mov.monto)), mov.categoria, mov.descripcion]
       .filter(Boolean)
       .join(' | ');
     const emoji = mov.tipo === 'ingreso' ? '💰' : '💸';
-    return `🗑️ Listo, borré el último movimiento:\n${emoji} ${detalle}`;
+    return `🗑️ Listo, borré el movimiento${refTag(mov.correlativo)}:\n${emoji} ${detalle}`;
   }
 
   // === Registro de monto requerido ===
@@ -80,7 +91,7 @@ export async function handleRegistro(
   }
 
   if (interp.tipo === 'ingreso' || interp.tipo === 'egreso') {
-    await insertMovimiento({
+    const nuevo = await insertMovimiento({
       userPhone: user.phone,
       tipo: interp.tipo,
       monto: interp.monto,
@@ -92,10 +103,11 @@ export async function handleRegistro(
     const detalle = [clp(interp.monto), interp.categoria, interp.descripcion]
       .filter(Boolean)
       .join(' | ');
+    const ref = refTag(nuevo.correlativo);
 
     if (interp.tipo === 'ingreso') {
       const tip = tipIngreso(interp.monto);
-      return `✅ Ingreso registrado\n💰 ${detalle}${tip}`;
+      return `✅ Ingreso registrado${ref}\n💰 ${detalle}${tip}`;
     }
 
     // Egreso: calcular balance del mes y alertar si es negativo
@@ -109,7 +121,7 @@ export async function handleRegistro(
       ? `\n\n⚠️ _Balance del mes: -${clp(Math.abs(balance))}. Escribe *resumen* para ver el detalle._`
       : '';
 
-    return `📤 Egreso registrado\n💸 ${detalle}${alertaBalance}`;
+    return `📤 Egreso registrado${ref}\n💸 ${detalle}${alertaBalance}`;
   }
 
   // tipo === 'deuda' → cuenta por cobrar

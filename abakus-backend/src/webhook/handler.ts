@@ -144,15 +144,15 @@ async function procesar(mensaje: MensajeEntrante): Promise<void> {
     return;
   }
   if (comando === 'eliminar') {
-    // Comando directo de deshacer: no requiere Claude.
-    const { eliminarUltimoMovimiento } = await import('../supabase/queries');
-    const { clp } = await import('../utils/format');
-    const mov = await eliminarUltimoMovimiento(usuario.phone);
+    // Comando directo de deshacer (último movimiento): no requiere Claude.
+    const { eliminarMovimiento } = await import('../supabase/queries');
+    const mov = await eliminarMovimiento(usuario.phone, null);
     if (!mov) {
       await sendText(mensaje.phone, 'No encontré movimientos recientes para borrar 🤔');
     } else {
+      const ref = mov.correlativo != null ? ` #${mov.correlativo}` : '';
       const detalle = [clp(Number(mov.monto)), mov.categoria, mov.descripcion].filter(Boolean).join(' | ');
-      await sendText(mensaje.phone, `🗑️ Borré el último movimiento:\n${mov.tipo === 'ingreso' ? '💰' : '💸'} ${detalle}`);
+      await sendText(mensaje.phone, `🗑️ Borré el movimiento${ref}:\n${mov.tipo === 'ingreso' ? '💰' : '💸'} ${detalle}`);
     }
     return;
   }
@@ -169,7 +169,9 @@ async function procesar(mensaje: MensajeEntrante): Promise<void> {
     getUltimoMovimiento(usuario.phone).catch(() => null),
   ]);
   const ctxUltimo = ultimo
-    ? `\n\nÚLTIMO MOVIMIENTO DEL USUARIO (úsalo si el mensaje corrige o se refiere a algo recién registrado): ${
+    ? `\n\nÚLTIMO MOVIMIENTO DEL USUARIO${
+        ultimo.correlativo != null ? ` (#${ultimo.correlativo})` : ''
+      } (úsalo si el mensaje corrige o se refiere a algo recién registrado): ${
         ultimo.tipo
       } de ${clp(Number(ultimo.monto))}${ultimo.categoria ? ` en "${ultimo.categoria}"` : ''}.`
     : '';

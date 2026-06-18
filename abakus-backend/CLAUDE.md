@@ -97,6 +97,23 @@ created_at        timestamptz DEFAULT now()
 > ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS memoria jsonb DEFAULT '[]'::jsonb;
 > ```
 
+> **Migración requerida para correlativos:** cada movimiento lleva un
+> correlativo por usuario (#1, #2, ...) para poder referenciarlo ("corrige el
+> #5"). Requiere columna `correlativo int` en `movimientos`. El código degrada
+> con gracia (inserta sin correlativo, las correcciones caen al último
+> movimiento). Migración + backfill del histórico:
+> ```sql
+> ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS correlativo int;
+> WITH numerados AS (
+>   SELECT id, ROW_NUMBER() OVER (PARTITION BY user_phone ORDER BY created_at) AS rn
+>   FROM movimientos
+> )
+> UPDATE movimientos m SET correlativo = n.rn FROM numerados n WHERE m.id = n.id;
+> ```
+> El próximo correlativo se calcula como `MAX(correlativo)+1` por usuario
+> (`siguienteCorrelativo`). Volumen bajo (un usuario escribe de a un mensaje),
+> así que el riesgo de colisión es despreciable.
+
 ## Aprendizaje del usuario (`src/aprendizaje/perfil.ts`)
 
 Abakus personaliza la interpretación de Claude con un "perfil" del usuario que

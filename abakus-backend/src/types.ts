@@ -25,6 +25,9 @@ export type TipoMovimiento = 'ingreso' | 'egreso';
 export interface Movimiento {
   id: string;
   user_phone: string;
+  // Correlativo por usuario (#1, #2, ...) para identificar y referenciar el
+  // movimiento. Requiere columna `correlativo int` en la tabla movimientos.
+  correlativo: number | null;
   tipo: TipoMovimiento;
   monto: number;
   categoria: string | null;
@@ -59,6 +62,8 @@ export interface Interpretacion {
   contraparte: string | null;
   fecha_vencimiento: string | null;
   respuesta: string;
+  // Correlativo del movimiento referido por el usuario (ej. "corrige el #5").
+  referencia: number | null;
   // ===== Aprendizaje: datos que Claude extrae para recordar =====
   negocio: string | null;      // a qué se dedica el usuario, si lo revela
   tono: string | null;         // preferencia de estilo, si la pide explícitamente

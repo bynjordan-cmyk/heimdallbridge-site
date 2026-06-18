@@ -130,6 +130,28 @@ export async function setPlan(phone: string, plan: 'basico' | 'pro' | 'gratis'):
   if (error) throw error;
 }
 
+/**
+ * Próximo correlativo (#N) por usuario. Devuelve null si la columna
+ * `correlativo` aún no existe, para degradar sin romper los inserts.
+ */
+export async function siguienteCorrelativo(userPhone: string): Promise<number | null> {
+  try {
+    const { data, error } = await supabase
+      .from('movimientos')
+      .select('correlativo')
+      .eq('user_phone', userPhone)
+      .order('correlativo', { ascending: false, nullsFirst: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) throw error;
+    const max = (data as { correlativo: number | null } | null)?.correlativo;
+    return (max ?? 0) + 1;
+  } catch {
+    return null;
+  }
+}
+
 export async function insertMovimiento(input: {
   userPhone: string;
   tipo: TipoMovimiento;
@@ -138,16 +160,21 @@ export async function insertMovimiento(input: {
   descripcion: string | null;
   rawMessage: string | null;
 }): Promise<Movimiento> {
+  const correlativo = await siguienteCorrelativo(input.userPhone);
+
+  const fila: Record<string, unknown> = {
+    user_phone: input.userPhone,
+    tipo: input.tipo,
+    monto: input.monto,
+    categoria: input.categoria,
+    descripcion: input.descripcion,
+    raw_message: input.rawMessage,
+  };
+  if (correlativo !== null) fila.correlativo = correlativo;
+
   const { data, error } = await supabase
     .from('movimientos')
-    .insert({
-      user_phone: input.userPhone,
-      tipo: input.tipo,
-      monto: input.monto,
-      categoria: input.categoria,
-      descripcion: input.descripcion,
-      raw_message: input.rawMessage,
-    })
+    .insert(fila)
     .select()
     .single();
 
@@ -167,17 +194,22 @@ export async function insertMovimientosMasivo(
   }[],
 ): Promise<void> {
   const CHUNK = 200;
+  const base = await siguienteCorrelativo(userPhone); // null si la columna no existe
 
   for (let i = 0; i < movimientos.length; i += CHUNK) {
-    const lote = movimientos.slice(i, i + CHUNK).map((m) => ({
-      user_phone: userPhone,
-      tipo: m.tipo,
-      monto: m.monto,
-      categoria: m.categoria,
-      descripcion: m.descripcion,
-      fecha: m.fecha,
-      raw_message: 'Carga masiva (Excel)',
-    }));
+    const lote = movimientos.slice(i, i + CHUNK).map((m, idx) => {
+      const fila: Record<string, unknown> = {
+        user_phone: userPhone,
+        tipo: m.tipo,
+        monto: m.monto,
+        categoria: m.categoria,
+        descripcion: m.descripcion,
+        fecha: m.fecha,
+        raw_message: 'Carga masiva (Excel)',
+      };
+      if (base !== null) fila.correlativo = base + i + idx;
+      return fila;
+    });
 
     const { error } = await supabase.from('movimientos').insert(lote);
     if (error) throw error;
@@ -371,21 +403,48 @@ export async function getUltimoMovimiento(userPhone: string): Promise<Movimiento
   return (data as Movimiento | null) ?? null;
 }
 
+/**
+ * Resuelve el movimiento objetivo: por correlativo (#N) si se indica, o el
+ * último si `correlativo` es null. Si la columna `correlativo` no existe,
+ * cae al último movimiento.
+ */
+export async function getMovimientoObjetivo(
+  userPhone: string,
+  correlativo: number | null,
+): Promise<Movimiento | null> {
+  if (correlativo === null) return getUltimoMovimiento(userPhone);
+
+  try {
+    const { data, error } = await supabase
+      .from('movimientos')
+      .select('*')
+      .eq('user_phone', userPhone)
+      .eq('correlativo', correlativo)
+      .maybeSingle();
+
+    if (error) throw error;
+    return (data as Movimiento | null) ?? null;
+  } catch {
+    return getUltimoMovimiento(userPhone);
+  }
+}
+
 export interface MovimientoCorregido {
   anterior: Movimiento;
   actualizado: Movimiento;
 }
 
 /**
- * Actualiza el movimiento más reciente del usuario con los cambios indicados
- * (solo los campos no-undefined). Devuelve el antes/después, o null si no había
- * ningún movimiento.
+ * Actualiza un movimiento (por correlativo, o el último si es null) con los
+ * cambios indicados (solo campos no-undefined). Devuelve el antes/después, o
+ * null si no se encontró el movimiento.
  */
-export async function actualizarUltimoMovimiento(
+export async function actualizarMovimiento(
   userPhone: string,
+  correlativo: number | null,
   cambios: Partial<Pick<Movimiento, 'tipo' | 'monto' | 'categoria' | 'descripcion'>>,
 ): Promise<MovimientoCorregido | null> {
-  const anterior = await getUltimoMovimiento(userPhone);
+  const anterior = await getMovimientoObjetivo(userPhone, correlativo);
   if (!anterior) return null;
 
   const limpio = Object.fromEntries(
@@ -408,24 +467,16 @@ export async function actualizarUltimoMovimiento(
 }
 
 /**
- * Elimina el movimiento más reciente del usuario.
- * Devuelve el movimiento eliminado, o null si no había ninguno.
+ * Elimina un movimiento (por correlativo, o el último si es null).
+ * Devuelve el movimiento eliminado, o null si no se encontró.
  */
-export async function eliminarUltimoMovimiento(
+export async function eliminarMovimiento(
   userPhone: string,
+  correlativo: number | null,
 ): Promise<Movimiento | null> {
-  const { data, error } = await supabase
-    .from('movimientos')
-    .select('*')
-    .eq('user_phone', userPhone)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const mov = await getMovimientoObjetivo(userPhone, correlativo);
+  if (!mov) return null;
 
-  if (error) throw error;
-  if (!data) return null;
-
-  const mov = data as Movimiento;
   const { error: delError } = await supabase.from('movimientos').delete().eq('id', mov.id);
   if (delError) throw delError;
   return mov;
