@@ -225,6 +225,7 @@ abakus-backend/
 ### Comandos especiales (v1) — no pasan por Claude
 
 - `resumen` / `saldo` → ingresos vs egresos del mes
+- `detalle` → lista de movimientos como texto en el chat (alternativa al Excel; "muéstrame en el chat", "sin excel", "en texto")
 - `cobros` / `pendientes` → cuentas por cobrar pendientes (lo que te deben)
 - `por pagar` / `mis deudas` / `qué debo` → cuentas por pagar pendientes (lo que debes)
 - `ayuda` → menú de comandos

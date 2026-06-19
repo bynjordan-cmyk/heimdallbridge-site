@@ -10,7 +10,7 @@ import {
   periodoMesesAtras,
 } from '../reports/periodo';
 
-export type ComandoEspecial = 'resumen' | 'cobros' | 'porpagar' | 'ayuda' | 'pago' | 'planes' | 'reporte' | 'eliminar' | 'comparar' | 'meta' | 'proyeccion' | 'plantilla';
+export type ComandoEspecial = 'resumen' | 'detalle' | 'cobros' | 'porpagar' | 'ayuda' | 'pago' | 'planes' | 'reporte' | 'eliminar' | 'comparar' | 'meta' | 'proyeccion' | 'plantilla';
 
 const MESES_ES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 const tieneMes = (s: string) => MESES_ES.some((m) => s.includes(m));
@@ -45,6 +45,18 @@ export function detectarComando(texto: string): ComandoEspecial | null {
       t.includes('tiene costo') || t.includes('es pago') || t.includes('es gratis')
     ))
   ) return 'planes';
+  // Detalle EN EL CHAT (texto), no Excel. Se evalúa ANTES que 'reporte' para que
+  // frases como "no lo quiero en excel, muéstrame en el chat" no caigan en Excel.
+  if (
+    t === 'detalle' || t.startsWith('detalle') ||
+    t.includes('en el chat') || t.includes('en chat') || t.includes('por chat') ||
+    t.includes('en texto') || t.includes('por texto') ||
+    t.includes('aquí mismo') || t.includes('aqui mismo') || t.includes('por aquí') || t.includes('por aqui') ||
+    t.includes('sin excel') || t.includes('no excel') || t.includes('no quiero excel') || t.includes('no en excel') || t.includes('no lo quiero en excel') ||
+    t.includes('lista de movimientos') || t.includes('lístame') || t.includes('listame') ||
+    t.includes('muéstrame los movimientos') || t.includes('muestrame los movimientos') ||
+    t.includes('ver movimientos') || t.includes('muéstrame el detalle') || t.includes('muestrame el detalle')
+  ) return 'detalle';
   if (
     t === 'reporte' || t.startsWith('reporte ') ||
     t === 'informe' || t.startsWith('informe ') ||
@@ -68,6 +80,7 @@ const AYUDA = `🧮 *Abakus* — esto es lo que puedo hacer:
 • *comparar* → este mes vs el mes pasado.
 • *cobros* → lo que te deben (cuentas por cobrar). "Juan me debe 30000".
 • *por pagar* → lo que tú debes (cuentas por pagar). "le debo 20000 a Ana" · "ya le pagué a Ana".
+• *detalle* → lista tus movimientos aquí en el chat (o "detalle mayo").
 • *reporte* → Excel con detalle completo (o "reporte mayo").
 • *meta 1500000* → fija tu objetivo mensual de ingresos (opcional).
 • "Juan me pagó" → marca la deuda como cobrada.
@@ -110,6 +123,10 @@ export async function handleComando(
     return formatearResumen(movs, periodo.label, esMesActual, esMesActual ? user.meta_mensual : null, user.moneda);
   }
 
+  if (comando === 'detalle') {
+    return handleDetalle(user, textoOriginal ?? '');
+  }
+
   if (comando === 'porpagar') {
     const cuentas = await getCuentasPorPagar(user.phone);
     if (cuentas.length === 0) {
@@ -140,6 +157,52 @@ export async function handleComando(
 
   const total = cuentas.reduce((acc, c) => acc + Number(c.monto), 0);
   return `📋 *Cuentas por cobrar pendientes*\n${lineas}\n\nTotal: ${f(total)}`;
+}
+
+const MAX_DETALLE = 40;
+
+/** Lista los movimientos del período como texto en el chat (alternativa al Excel). */
+async function handleDetalle(user: Usuario, textoOriginal: string): Promise<string> {
+  const f = (n: number) => formatMonto(n, user.moneda);
+  const t = textoOriginal.toLowerCase();
+  const periodo = tieneMes(t) ? parsearPeriodo(t) : mesActual();
+  const movs = await getMovimientosPeriodo(user.phone, periodo.desde, periodo.hasta);
+
+  if (movs.length === 0) {
+    return `📋 No tienes movimientos registrados en ${periodo.label}.`;
+  }
+
+  const orden = [...movs].sort((a, b) =>
+    a.fecha === b.fecha
+      ? (a.correlativo ?? 0) - (b.correlativo ?? 0)
+      : a.fecha.localeCompare(b.fecha),
+  );
+
+  const lineas = orden.slice(0, MAX_DETALLE).map((m) => {
+    const ref = m.correlativo != null ? `#${m.correlativo} ` : '';
+    const emoji = m.tipo === 'ingreso' ? '💰' : '💸';
+    const cat = m.categoria ? ` · ${m.categoria}` : '';
+    return `${ref}${emoji} ${diaMes(m.fecha)} · ${f(Number(m.monto))}${cat}`;
+  }).join('\n');
+
+  const ingresos = movs.filter((m) => m.tipo === 'ingreso').reduce((s, m) => s + Number(m.monto), 0);
+  const egresos = movs.filter((m) => m.tipo === 'egreso').reduce((s, m) => s + Number(m.monto), 0);
+  const balance = ingresos - egresos;
+
+  let msg = `📋 *Detalle ${periodo.label}*\n${lineas}`;
+  if (orden.length > MAX_DETALLE) {
+    msg += `\n_…y ${orden.length - MAX_DETALLE} más. Escribe *reporte* para el Excel completo._`;
+  }
+  msg += `\n\n💰 Ingresos: ${f(ingresos)}\n💸 Egresos: ${f(egresos)}\n🧮 Balance: ${
+    balance < 0 ? '-' : ''
+  }${f(Math.abs(balance))}`;
+  return msg;
+}
+
+/** "2026-06-19" -> "19/06". */
+function diaMes(iso: string): string {
+  const [, m, d] = iso.split('-');
+  return `${d}/${m}`;
 }
 
 async function handleMeta(user: Usuario, textoOriginal: string): Promise<string> {
