@@ -82,16 +82,23 @@ export async function getContrapartesFrecuentes(userPhone: string, limite = 8): 
 }
 
 function topPorFrecuencia(valores: (string | null)[], limite: number): string[] {
-  const counts = new Map<string, number>();
+  // Agrupa case-insensitive (clave en minúsculas) para que "Transporte" y
+  // "transporte" no cuenten como dos categorías distintas, y usa como etiqueta
+  // la variante de escritura más frecuente del grupo (canónica del usuario).
+  const grupos = new Map<string, { total: number; variantes: Map<string, number> }>();
   for (const v of valores) {
     const c = (v ?? '').trim();
     if (!c) continue;
-    counts.set(c, (counts.get(c) ?? 0) + 1);
+    const key = c.toLowerCase();
+    const g = grupos.get(key) ?? { total: 0, variantes: new Map<string, number>() };
+    g.total += 1;
+    g.variantes.set(c, (g.variantes.get(c) ?? 0) + 1);
+    grupos.set(key, g);
   }
-  return [...counts.entries()]
-    .sort((a, b) => b[1] - a[1])
+  return [...grupos.values()]
+    .sort((a, b) => b.total - a.total)
     .slice(0, limite)
-    .map(([c]) => c);
+    .map((g) => [...g.variantes.entries()].sort((a, b) => b[1] - a[1])[0][0]);
 }
 
 /**
