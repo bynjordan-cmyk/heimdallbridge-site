@@ -47,6 +47,8 @@ export function invitacionPrimerRegistro(user: Usuario): string {
 💡 ¿Quieres traer lo de estos días de una vez? Mándamelos todos juntos en un mensaje:
 _"vendí 50 mil el lunes, pagué 20 mil de arriendo y gasté 8 mil en bencina"_
 
+🏦 ¿Manejas bancos o caja? Dime cuáles usas (ej. _"tengo Banco Estado con 100000 y caja con 5000"_) y te llevo el *saldo de cada cuenta*, incluso transferencias entre ellas. Escribe *cuentas* para verlos cuando quieras.
+
 💱 Registraré tus montos en *${moneda}* (ej. ${ejemplo}). Si usas otra moneda, solo dímelo (ej. _"uso dólares"_).
 
 Cuando quieras tu balance, escribe *resumen*. Y *ayuda* para ver todo lo que puedo hacer.`;
