@@ -69,7 +69,12 @@ APRENDIZAJE DEL USUARIO (campos extra que debes devolver siempre):
 - Si en el contexto recibes un PERFIL DEL USUARIO, úsalo para clasificar y responder mejor. En especial, REUTILIZA una categoría que el usuario ya use si el movimiento calza con ella (no inventes un sinónimo: si ya usa "Internet", no crees "Wifi"). Crea una categoría nueva solo si ninguna existente aplica.
 - "negocio": si el usuario revela a qué se dedica (ej. "soy diseñador freelance", "tengo un food truck", "vendo ropa"), devuélvelo en una frase corta. Si no lo revela, negocio = null.
 - "tono": SOLO si el usuario pide explícitamente cómo hablarle (ej. "háblame más formal", "trátame de tú", "usa menos emojis"), devuélvelo como una breve instrucción. Si no lo pide, tono = null.
-- "aprendizaje": si el usuario menciona un dato durable y útil para el futuro (ej. "trabajo con boleta de honorarios", "mi socio es Pedro", "cierro el mes el día 25"), devuélvelo como una frase corta. Si no hay nada nuevo que valga la pena recordar, o si el dato ya está en la memoria del perfil, aprendizaje = null. No guardes montos puntuales ni cosas efímeras.`;
+- "aprendizaje": si el usuario menciona un dato durable y útil para el futuro (ej. "trabajo con boleta de honorarios", "mi socio es Pedro", "cierro el mes el día 25"), devuélvelo como una frase corta. Si no hay nada nuevo que valga la pena recordar, o si el dato ya está en la memoria del perfil, aprendizaje = null. No guardes montos puntuales ni cosas efímeras.
+
+FORMATO DE SALIDA (importante):
+- En los campos de TEXTO opcionales (nombre, categoria, descripcion, contraparte, fecha_vencimiento, cuenta, cuenta_origen, cuenta_destino, nuevo_tipo, negocio, tono, aprendizaje, moneda), cuando NO apliquen devuelve una CADENA VACÍA "" — nunca la palabra "null" ni texto de relleno.
+- En los campos NUMÉRICOS opcionales (monto, referencia, saldo_inicial) usa null cuando no apliquen.
+- "movimientos" usa [] cuando no haya ingresos/egresos.`;
 
 // JSON Schema escrito a mano para structured outputs.
 const SCHEMA = {
@@ -79,12 +84,12 @@ const SCHEMA = {
       type: 'string',
       enum: ['ingreso', 'egreso', 'consulta', 'deuda', 'cobro', 'cuenta_pagar', 'saldar', 'eliminar', 'corregir', 'crear_cuenta', 'transferencia', 'desconocido'],
     },
-    nombre: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+    nombre: { type: 'string' },
     monto: { anyOf: [{ type: 'number' }, { type: 'null' }] },
-    categoria: { anyOf: [{ type: 'string' }, { type: 'null' }] },
-    descripcion: { anyOf: [{ type: 'string' }, { type: 'null' }] },
-    contraparte: { anyOf: [{ type: 'string' }, { type: 'null' }] },
-    fecha_vencimiento: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+    categoria: { type: 'string' },
+    descripcion: { type: 'string' },
+    contraparte: { type: 'string' },
+    fecha_vencimiento: { type: 'string' },
     respuesta: { type: 'string' },
     movimientos: {
       type: 'array',
@@ -93,25 +98,25 @@ const SCHEMA = {
         properties: {
           tipo: { type: 'string', enum: ['ingreso', 'egreso'] },
           monto: { type: 'number' },
-          categoria: { anyOf: [{ type: 'string' }, { type: 'null' }] },
-          descripcion: { anyOf: [{ type: 'string' }, { type: 'null' }] },
-          fecha: { anyOf: [{ type: 'string' }, { type: 'null' }] },
-          cuenta: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+          categoria: { type: 'string' },
+          descripcion: { type: 'string' },
+          fecha: { type: 'string' },
+          cuenta: { type: 'string' },
         },
         required: ['tipo', 'monto', 'categoria', 'descripcion', 'fecha', 'cuenta'],
         additionalProperties: false,
       },
     },
     referencia: { anyOf: [{ type: 'number' }, { type: 'null' }] },
-    nuevo_tipo: { anyOf: [{ type: 'string', enum: ['ingreso', 'egreso'] }, { type: 'null' }] },
-    cuenta: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+    nuevo_tipo: { type: 'string', enum: ['ingreso', 'egreso', ''] },
+    cuenta: { type: 'string' },
     saldo_inicial: { anyOf: [{ type: 'number' }, { type: 'null' }] },
-    cuenta_origen: { anyOf: [{ type: 'string' }, { type: 'null' }] },
-    cuenta_destino: { anyOf: [{ type: 'string' }, { type: 'null' }] },
-    negocio: { anyOf: [{ type: 'string' }, { type: 'null' }] },
-    tono: { anyOf: [{ type: 'string' }, { type: 'null' }] },
-    aprendizaje: { anyOf: [{ type: 'string' }, { type: 'null' }] },
-    moneda: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+    cuenta_origen: { type: 'string' },
+    cuenta_destino: { type: 'string' },
+    negocio: { type: 'string' },
+    tono: { type: 'string' },
+    aprendizaje: { type: 'string' },
+    moneda: { type: 'string' },
   },
   required: [
     'tipo',
@@ -201,11 +206,10 @@ function normalizar(raw: string): Interpretacion {
       ? parsed.nombre.trim()
       : null,
     monto: typeof parsed.monto === 'number' ? parsed.monto : null,
-    categoria: typeof parsed.categoria === 'string' ? parsed.categoria : null,
-    descripcion: typeof parsed.descripcion === 'string' ? parsed.descripcion : null,
-    contraparte: typeof parsed.contraparte === 'string' ? parsed.contraparte : null,
-    fecha_vencimiento:
-      typeof parsed.fecha_vencimiento === 'string' ? parsed.fecha_vencimiento : null,
+    categoria: textoLimpio(parsed.categoria),
+    descripcion: textoLimpio(parsed.descripcion),
+    contraparte: textoLimpio(parsed.contraparte),
+    fecha_vencimiento: textoLimpio(parsed.fecha_vencimiento),
     respuesta:
       typeof parsed.respuesta === 'string' && parsed.respuesta.trim().length > 0
         ? parsed.respuesta
