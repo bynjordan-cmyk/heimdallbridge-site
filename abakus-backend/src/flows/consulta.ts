@@ -10,7 +10,7 @@ import {
   periodoMesesAtras,
 } from '../reports/periodo';
 
-export type ComandoEspecial = 'resumen' | 'cobros' | 'ayuda' | 'pago' | 'reporte' | 'eliminar' | 'comparar' | 'meta' | 'proyeccion' | 'plantilla';
+export type ComandoEspecial = 'resumen' | 'cobros' | 'ayuda' | 'pago' | 'planes' | 'reporte' | 'eliminar' | 'comparar' | 'meta' | 'proyeccion' | 'plantilla';
 
 const MESES_ES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 const tieneMes = (s: string) => MESES_ES.some((m) => s.includes(m));
@@ -23,8 +23,22 @@ export function detectarComando(texto: string): ComandoEspecial | null {
   if (t === 'ayuda' || t === 'help' || t === 'menu' || t === 'menú') return 'ayuda';
   if (
     t === 'pagar' || t === 'suscribirme' || t === 'suscribir' ||
-    t === 'suscripción' || t === 'suscripcion' || t === 'plan' || t === 'premium'
+    t === 'suscripción' || t === 'suscripcion' || t === 'quiero pagar' ||
+    t === 'activar' || t === 'activar plan' || t === 'quiero suscribirme'
   ) return 'pago';
+  // Preguntas informativas sobre planes/precios. Se excluyen mensajes con
+  // números (probablemente un registro tipo "plan de ahorro 5000").
+  const sinNumero = !/\d/.test(t);
+  if (
+    t === 'plan' || t === 'planes' || t === 'premium' ||
+    (sinNumero && (
+      t.includes('plan') || t.includes('precio') || t.includes('tarifa') ||
+      t.includes('cuánto cuesta') || t.includes('cuanto cuesta') ||
+      t.includes('cuánto vale') || t.includes('cuanto vale') ||
+      t.includes('cuánto sale') || t.includes('cuanto sale') ||
+      t.includes('tiene costo') || t.includes('es pago') || t.includes('es gratis')
+    ))
+  ) return 'planes';
   if (
     t === 'reporte' || t.startsWith('reporte ') ||
     t === 'informe' || t.startsWith('informe ') ||
@@ -54,7 +68,7 @@ const AYUDA = `🧮 *Abakus* — esto es lo que puedo hacer:
 • *deshacer* → borra el último movimiento registrado.
 • Cuéntame una deuda: "Juan me debe 30000 para el 30/06".
 • *plantilla* → descarga un Excel para cargar varios movimientos de una vez. Complétalo y reenvíamelo por aquí.
-• *plan* o *suscribirme* → activa tu suscripción.
+• *planes* → ver los planes y precios · *suscribirme* → activar tu plan.
 
 ¿En qué te ayudo?`;
 
@@ -66,7 +80,7 @@ export async function handleComando(
   if (comando === 'ayuda') return AYUDA;
 
   // Manejados directamente en handler.ts
-  // 'pago', 'reporte', 'eliminar', 'plantilla' → return early desde handler
+  // 'pago', 'planes', 'reporte', 'eliminar', 'plantilla' → return early desde handler
 
   if (comando === 'meta') {
     return handleMeta(user, textoOriginal ?? '');

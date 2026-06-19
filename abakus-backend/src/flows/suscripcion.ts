@@ -108,6 +108,23 @@ function detectarPlan(texto: string): PlanAbakus | null {
   return null;
 }
 
+/** Descripción informativa de los planes (cuando el usuario pregunta por ellos
+ *  sin iniciar el flujo de pago). Nunca afirma que Abakus es gratis. */
+export function descripcionPlanes(): string {
+  const pb = config.pago.precioBasico > 0 ? ` — ${clp(config.pago.precioBasico)}/mes` : '';
+  const pp = config.pago.precioPro > 0 ? ` — ${clp(config.pago.precioPro)}/mes` : '';
+
+  return `🧮 *Planes de Abakus*
+
+1️⃣ *Plan Básico*${pb}
+Ingresos y egresos ilimitados · hasta 3 cuentas por cobrar activas · historial de 90 días.
+
+2️⃣ *Plan Pro*${pp} ⭐
+Todo lo del Básico + cuentas por cobrar ilimitadas · historial completo · recordatorios automáticos de cobro · reporte Excel exportable.
+
+Para activar tu plan, escribe *suscribirme*.`;
+}
+
 function mensajeSeleccionPlan(): string {
   const precioBasico = clp(config.pago.precioBasico);
   const precioPro = clp(config.pago.precioPro);

@@ -13,6 +13,7 @@ import { handleReporte } from '../flows/reporte';
 import { handleCargaMasiva, handlePlantilla } from '../flows/carga';
 import {
   accesoVigente,
+  descripcionPlanes,
   esperandoEmail,
   esperandoPlan,
   iniciarSuscripcion,
@@ -129,6 +130,10 @@ async function procesar(mensaje: MensajeEntrante): Promise<void> {
 
   // Comandos especiales: no pasan por Claude.
   const comando = detectarComando(mensaje.texto);
+  if (comando === 'planes') {
+    await sendText(mensaje.phone, descripcionPlanes());
+    return;
+  }
   if (comando === 'pago') {
     const respuesta = await iniciarSuscripcion(usuario);
     await sendText(mensaje.phone, respuesta);
