@@ -20,7 +20,7 @@ TIPOS posibles:
 - "cuenta_pagar": el usuario DEBE dinero a alguien o tiene un pago pendiente a futuro / cuenta por PAGAR (le debo a, tengo que pagar, quedé debiendo, debo el arriendo, hay que pagarle a, vence mi cuota...). Distíntelo de "egreso": egreso = ya salió el dinero; cuenta_pagar = obligación pendiente, aún no pagada.
 - "saldar": el usuario pagó una cuenta por pagar que tenía pendiente (ya le pagué a, salde la deuda, pagué lo que debía, cancelé la cuota de...). Distíntelo de "egreso": "saldar" liquida una deuda registrada antes; si nunca registró esa deuda, probablemente es un "egreso".
 - "eliminar": el usuario quiere borrar el último movimiento registrado (me equivoqué, borra el último, deshacer, undo, error...)
-- "corregir": el usuario quiere MODIFICAR un movimiento que registró, no borrarlo (ej. "no, eran 3 mil", "modifica el monto a 5000", "lo pusiste mal, eran 2000", "cambia la categoría a transporte", "fueron solo 3mil", "corrige el #5 a 2000"). Devuelve en monto/categoria/descripcion SOLO los valores corregidos; deja en null lo que no cambia.
+- "corregir": el usuario quiere MODIFICAR un movimiento que registró, no borrarlo (ej. "no, eran 3 mil", "modifica el monto a 5000", "lo pusiste mal, eran 2000", "cambia la categoría a transporte", "fueron solo 3mil", "corrige el #5 a 2000", "era un ingreso no egreso"). Devuelve en monto/categoria/descripcion SOLO los valores corregidos; deja en null lo que no cambia. Si la corrección cambia el TIPO del movimiento (de ingreso a egreso o viceversa), indícalo en "nuevo_tipo" (ingreso|egreso); si no cambia el tipo, nuevo_tipo = null.
 - "consulta": pregunta sobre sus datos, saludos, presentaciones de nombre, agradecimientos, o cualquier mensaje fuera de registro
 - "desconocido": el mensaje es ambiguo y necesita clarificación. INCLUYE el caso en que hay un monto pero NO está clara la DIRECCIÓN (si entró o salió dinero).
 
@@ -98,6 +98,7 @@ const SCHEMA = {
       },
     },
     referencia: { anyOf: [{ type: 'number' }, { type: 'null' }] },
+    nuevo_tipo: { anyOf: [{ type: 'string', enum: ['ingreso', 'egreso'] }, { type: 'null' }] },
     negocio: { anyOf: [{ type: 'string' }, { type: 'null' }] },
     tono: { anyOf: [{ type: 'string' }, { type: 'null' }] },
     aprendizaje: { anyOf: [{ type: 'string' }, { type: 'null' }] },
@@ -114,6 +115,7 @@ const SCHEMA = {
     'respuesta',
     'movimientos',
     'referencia',
+    'nuevo_tipo',
     'negocio',
     'tono',
     'aprendizaje',
@@ -194,6 +196,9 @@ function normalizar(raw: string): Interpretacion {
       typeof parsed.referencia === 'number' && Number.isFinite(parsed.referencia)
         ? Math.trunc(parsed.referencia)
         : null,
+    nuevo_tipo: parsed.nuevo_tipo === 'ingreso' || parsed.nuevo_tipo === 'egreso'
+      ? parsed.nuevo_tipo
+      : null,
     negocio: textoLimpio(parsed.negocio),
     tono: textoLimpio(parsed.tono),
     aprendizaje: textoLimpio(parsed.aprendizaje),

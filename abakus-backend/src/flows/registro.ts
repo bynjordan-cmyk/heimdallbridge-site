@@ -50,6 +50,7 @@ export async function handleRegistro(
   // === Corregir un movimiento (por #referencia o el último) ===
   if (interp.tipo === 'corregir') {
     const res = await actualizarMovimiento(user.phone, interp.referencia, {
+      tipo: interp.nuevo_tipo ?? undefined,
       monto: interp.monto ?? undefined,
       categoria: interp.categoria ?? undefined,
       descripcion: interp.descripcion ?? undefined,
@@ -63,6 +64,10 @@ export async function handleRegistro(
 
     const { anterior, actualizado } = res;
     const cambios: string[] = [];
+    if (anterior.tipo !== actualizado.tipo) {
+      const nombreTipo = (t: string) => (t === 'ingreso' ? 'Ingreso' : 'Egreso');
+      cambios.push(`🔄 Tipo: ${nombreTipo(anterior.tipo)} → *${nombreTipo(actualizado.tipo)}*`);
+    }
     if (Number(anterior.monto) !== Number(actualizado.monto)) {
       cambios.push(`💲 Monto: ${f(Number(anterior.monto))} → *${f(Number(actualizado.monto))}*`);
     }

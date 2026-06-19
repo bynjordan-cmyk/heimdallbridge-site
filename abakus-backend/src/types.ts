@@ -83,6 +83,9 @@ export interface Interpretacion {
   movimientos: MovimientoInterpretado[];
   // Correlativo del movimiento referido por el usuario (ej. "corrige el #5").
   referencia: number | null;
+  // Nuevo tipo al corregir un movimiento ("era un ingreso no egreso"). null si
+  // la corrección no cambia el tipo. Solo aplica a tipo === 'corregir'.
+  nuevo_tipo: TipoMovimiento | null;
   // ===== Aprendizaje: datos que Claude extrae para recordar =====
   negocio: string | null;      // a qué se dedica el usuario, si lo revela
   tono: string | null;         // preferencia de estilo, si la pide explícitamente
