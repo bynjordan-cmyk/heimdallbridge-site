@@ -305,6 +305,22 @@ export function insertCuentaPorPagar(input: {
 
 // ===== Cuentas (bancos / caja) y transferencias =====
 
+/** Error de migración pendiente: las tablas/columnas de cuentas aún no existen. */
+export class CuentasNoDisponibleError extends Error {
+  constructor() {
+    super('Las tablas de cuentas aún no existen (migración pendiente).');
+    this.name = 'CuentasNoDisponibleError';
+  }
+}
+
+/** ¿El error de Supabase es por una tabla o columna que aún no existe? */
+function esEsquemaFaltante(error: { code?: string; message?: string } | null): boolean {
+  if (!error) return false;
+  if (error.code === '42P01' || error.code === '42703') return true; // undefined_table / undefined_column
+  const m = (error.message ?? '').toLowerCase();
+  return m.includes('does not exist') || m.includes('schema cache') || m.includes('could not find');
+}
+
 function normalizarNombre(s: string): string {
   return s.normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase();
 }
@@ -316,7 +332,10 @@ export async function getCuentas(userPhone: string): Promise<Cuenta[]> {
     .eq('user_phone', userPhone)
     .order('created_at', { ascending: true });
 
-  if (error) throw error;
+  if (error) {
+    if (esEsquemaFaltante(error)) return []; // migración pendiente → sin cuentas
+    throw error;
+  }
   return (data ?? []) as Cuenta[];
 }
 
@@ -367,7 +386,10 @@ export async function crearCuenta(
       .eq('id', existente.id)
       .select()
       .single();
-    if (error) throw error;
+    if (error) {
+      if (esEsquemaFaltante(error)) throw new CuentasNoDisponibleError();
+      throw error;
+    }
     return { cuenta: data as Cuenta, actualizada: true };
   }
 
@@ -376,7 +398,10 @@ export async function crearCuenta(
     .insert({ user_phone: userPhone, nombre, tipo, saldo_inicial: saldoInicial })
     .select()
     .single();
-  if (error) throw error;
+  if (error) {
+    if (esEsquemaFaltante(error)) throw new CuentasNoDisponibleError();
+    throw error;
+  }
   return { cuenta: data as Cuenta, actualizada: false };
 }
 
@@ -396,8 +421,8 @@ export async function getSaldosCuentas(userPhone: string): Promise<CuentaConSald
       .select('cuenta_origen, cuenta_destino, monto')
       .eq('user_phone', userPhone),
   ]);
-  if (movRes.error) throw movRes.error;
-  if (traRes.error) throw traRes.error;
+  if (movRes.error && !esEsquemaFaltante(movRes.error)) throw movRes.error;
+  if (traRes.error && !esEsquemaFaltante(traRes.error)) throw traRes.error;
 
   const saldos = new Map<string, number>();
   for (const c of cuentas) saldos.set(c.id, Number(c.saldo_inicial) || 0);
@@ -436,7 +461,10 @@ export async function insertTransferencia(
   if (fecha) fila.fecha = fecha;
 
   const { error } = await supabase.from('transferencias').insert(fila);
-  if (error) throw error;
+  if (error) {
+    if (esEsquemaFaltante(error)) throw new CuentasNoDisponibleError();
+    throw error;
+  }
 }
 
 export interface ResumenMes {

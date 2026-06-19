@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { Interpretacion, MensajeEntrante, Usuario, WhatsAppWebhookBody } from '../types';
 import { yaProcesado } from '../utils/idempotency';
-import { getUsuarioByPhone, updateUsuario, agregarAprendizaje, getUltimoMovimiento } from '../supabase/queries';
+import { getUsuarioByPhone, updateUsuario, agregarAprendizaje, getUltimoMovimiento, CuentasNoDisponibleError } from '../supabase/queries';
 import { interpretar } from '../claude/interpreter';
 import { construirPerfil } from '../aprendizaje/perfil';
 import { esMonedaSoportada, formatMonto } from '../utils/format';
@@ -35,6 +35,8 @@ import {
 } from '../flows/suscripcion';
 
 const ERROR_GENERICO = 'Ups, algo salió mal 😅 Intenta de nuevo en un momento.';
+const ERROR_CUENTAS_NO_DISP =
+  '🏦 El control de *cuentas y saldos* (bancos/caja) estará disponible muy pronto 🙌\n\nMientras tanto, registro tus ingresos, egresos y deudas sin problema. Escribe *resumen* para ver tu balance.';
 
 /**
  * POST del webhook de Meta. Confirma recepción (< 5s) y procesa en background.
@@ -48,8 +50,9 @@ export function handleWebhook(req: Request, res: Response): void {
 
   void procesar(mensaje).catch(async (err) => {
     console.error('[abakus] Error procesando mensaje:', err);
+    const respuesta = err instanceof CuentasNoDisponibleError ? ERROR_CUENTAS_NO_DISP : ERROR_GENERICO;
     try {
-      await sendText(mensaje.phone, ERROR_GENERICO);
+      await sendText(mensaje.phone, respuesta);
     } catch (sendErr) {
       console.error('[abakus] Error enviando mensaje de error:', sendErr);
     }
