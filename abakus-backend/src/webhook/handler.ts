@@ -4,10 +4,10 @@ import { yaProcesado } from '../utils/idempotency';
 import { getUsuarioByPhone, updateUsuario, agregarAprendizaje, getUltimoMovimiento } from '../supabase/queries';
 import { interpretar } from '../claude/interpreter';
 import { construirPerfil } from '../aprendizaje/perfil';
-import { clp } from '../utils/format';
+import { esMonedaSoportada, formatMonto } from '../utils/format';
 import { sendText } from '../whatsapp/sender';
-import { handleOnboarding } from '../flows/onboarding';
-import { handleRegistro } from '../flows/registro';
+import { enOnboarding, iniciarOnboarding, invitacionPrimerRegistro } from '../flows/onboarding';
+import { handleRegistro, registrarMovimientos } from '../flows/registro';
 import { detectarComando, handleComando } from '../flows/consulta';
 import { handleReporte } from '../flows/reporte';
 import { handleCargaMasiva, handlePlantilla } from '../flows/carga';
@@ -84,10 +84,12 @@ function extraerMensaje(body: WhatsAppWebhookBody): MensajeEntrante | null {
   };
 }
 
-/** Normaliza a solo dígitos, sin '+' (ej: "+56935594094" -> "56935594094").
- *  Coincide con el formato que usa el flujo de n8n en las tablas Supabase. */
+/** Normaliza a E.164 con '+' (ej: "56935594094" -> "+56935594094").
+ *  Coincide con el formato que usa el flujo de n8n en las tablas Supabase, para
+ *  reconocer a los usuarios existentes y no fragmentar su historial. El envío por
+ *  Cloud API quita el '+' por su cuenta (whatsapp/sender.ts). */
 function normalizarTelefono(raw: string): string {
-  return raw.replace(/\D/g, '');
+  return '+' + raw.replace(/\D/g, '');
 }
 
 async function procesar(mensaje: MensajeEntrante): Promise<void> {
@@ -97,9 +99,9 @@ async function procesar(mensaje: MensajeEntrante): Promise<void> {
 
   const usuario = await getUsuarioByPhone(mensaje.phone);
 
-  // Usuario nuevo → onboarding (crea registro y envía bienvenida).
+  // Usuario nuevo → onboarding guiado (crea registro y envía bienvenida + 1ª pregunta).
   if (!usuario) {
-    const bienvenida = await handleOnboarding(mensaje.phone, mensaje.nombre);
+    const bienvenida = await iniciarOnboarding(mensaje.phone, mensaje.nombre);
     await sendText(mensaje.phone, bienvenida);
     return;
   }
@@ -118,6 +120,7 @@ async function procesar(mensaje: MensajeEntrante): Promise<void> {
 
   // Carga masiva: el usuario envió un documento Excel.
   if (mensaje.documento) {
+    await salirDeOnboarding(usuario);
     if (!accesoVigente(usuario)) {
       await sendText(mensaje.phone, mensajeTrialVencido());
       return;
@@ -130,6 +133,7 @@ async function procesar(mensaje: MensajeEntrante): Promise<void> {
 
   // Comandos especiales: no pasan por Claude.
   const comando = detectarComando(mensaje.texto);
+  if (comando) await salirDeOnboarding(usuario);
   if (comando === 'planes') {
     await sendText(mensaje.phone, descripcionPlanes());
     return;
@@ -156,7 +160,7 @@ async function procesar(mensaje: MensajeEntrante): Promise<void> {
       await sendText(mensaje.phone, 'No encontré movimientos recientes para borrar 🤔');
     } else {
       const ref = mov.correlativo != null ? ` #${mov.correlativo}` : '';
-      const detalle = [clp(Number(mov.monto)), mov.categoria, mov.descripcion].filter(Boolean).join(' | ');
+      const detalle = [formatMonto(Number(mov.monto), usuario.moneda), mov.categoria, mov.descripcion].filter(Boolean).join(' | ');
       await sendText(mensaje.phone, `🗑️ Borré el movimiento${ref}:\n${mov.tipo === 'ingreso' ? '💰' : '💸'} ${detalle}`);
     }
     return;
@@ -178,28 +182,63 @@ async function procesar(mensaje: MensajeEntrante): Promise<void> {
         ultimo.correlativo != null ? ` (#${ultimo.correlativo})` : ''
       } (úsalo si el mensaje corrige o se refiere a algo recién registrado): ${
         ultimo.tipo
-      } de ${clp(Number(ultimo.monto))}${ultimo.categoria ? ` en "${ultimo.categoria}"` : ''}.`
+      } de ${formatMonto(Number(ultimo.monto), usuario.moneda)}${ultimo.categoria ? ` en "${ultimo.categoria}"` : ''}.`
     : '';
-  const interp = await interpretar(mensaje.texto, { nombre: usuario.nombre, perfil: perfil + ctxUltimo });
+  const interp = await interpretar(mensaje.texto, {
+    nombre: usuario.nombre,
+    perfil: perfil + ctxUltimo,
+    moneda: usuario.moneda,
+  });
 
   // Persistir lo que Abakus aprendió de este mensaje (nombre, negocio, tono, memoria).
   await persistirAprendizaje(usuario, interp);
 
+  // Ingresos/egresos detectados (1 o varios). Fallback: si el modelo marcó el
+  // tipo pero no llenó el arreglo, armamos un item con los campos del nivel superior.
+  let items = interp.movimientos;
+  if (
+    items.length === 0 &&
+    (interp.tipo === 'ingreso' || interp.tipo === 'egreso') &&
+    interp.monto != null
+  ) {
+    items = [{
+      tipo: interp.tipo,
+      monto: interp.monto,
+      categoria: interp.categoria,
+      descripcion: interp.descripcion,
+      fecha: null,
+    }];
+  }
+  const tieneMovs = items.length > 0;
+
   // cobro, eliminar y corregir detectados por Claude también pasan por handleRegistro.
-  const esAccionDatos = interp.tipo === 'ingreso' || interp.tipo === 'egreso' ||
-    interp.tipo === 'deuda' || interp.tipo === 'cobro' || interp.tipo === 'eliminar' ||
-    interp.tipo === 'corregir';
+  const esAccionDatos = tieneMovs || interp.tipo === 'deuda' || interp.tipo === 'cobro' ||
+    interp.tipo === 'eliminar' || interp.tipo === 'corregir';
+
+  // Onboarding paso 2: si está en el paso "¿a qué te dedicas?" y NO registró
+  // nada, esto es su respuesta de negocio (ya guardada por el aprendizaje) →
+  // lo invitamos al primer registro. Si sí registró algo, salimos del onboarding
+  // y dejamos que fluya (con su celebración de primera victoria).
+  if (enOnboarding(usuario)) {
+    await salirDeOnboarding(usuario);
+    if (!esAccionDatos) {
+      await sendText(mensaje.phone, invitacionPrimerRegistro(usuario));
+      return;
+    }
+  }
 
   // Candado de trial: solo bloquea nuevos registros (ingreso/egreso/deuda).
-  const requiereAcceso = interp.tipo === 'ingreso' || interp.tipo === 'egreso' || interp.tipo === 'deuda';
+  const requiereAcceso = tieneMovs || interp.tipo === 'deuda';
   if (requiereAcceso && !accesoVigente(usuario)) {
     await sendText(mensaje.phone, mensajeTrialVencido());
     return;
   }
 
   let respuesta: string;
-  if (esAccionDatos) {
-    respuesta = await handleRegistro(usuario, interp, mensaje.texto);
+  if (tieneMovs) {
+    respuesta = await registrarMovimientos(usuario, items, mensaje.texto);
+  } else if (esAccionDatos) {
+    respuesta = await handleRegistro(usuario, interp);
   } else {
     // 'consulta' | 'desconocido' → usamos la respuesta del modelo.
     respuesta = interp.respuesta;
@@ -209,13 +248,28 @@ async function procesar(mensaje: MensajeEntrante): Promise<void> {
 }
 
 /**
+ * Limpia el estado de onboarding en memoria y en la DB (idempotente). Se llama
+ * cuando el usuario hace algo distinto a responder la pregunta de onboarding
+ * (un comando, un documento o un registro). Nunca rompe el flujo principal.
+ */
+async function salirDeOnboarding(usuario: Usuario): Promise<void> {
+  if (!enOnboarding(usuario)) return;
+  usuario.estado_conversacion = null;
+  try {
+    await updateUsuario(usuario.phone, { estado_conversacion: null });
+  } catch (err) {
+    console.error('[abakus][onboarding] No se pudo limpiar el estado:', err);
+  }
+}
+
+/**
  * Guarda lo que Abakus aprendió del usuario en este mensaje: nombre, negocio y
  * tono (campos directos de `usuarios`) y memoria explícita (lista de datos
  * durables). Nunca rompe el flujo principal: los errores se loguean y se ignoran
  * (ej. si aún no existe la columna `memoria` en la DB).
  */
 async function persistirAprendizaje(usuario: Usuario, interp: Interpretacion): Promise<void> {
-  const campos: Partial<Pick<Usuario, 'nombre' | 'negocio' | 'tono'>> = {};
+  const campos: Partial<Pick<Usuario, 'nombre' | 'negocio' | 'tono' | 'moneda'>> = {};
 
   if (interp.nombre && interp.nombre !== usuario.nombre) {
     campos.nombre = interp.nombre;
@@ -229,7 +283,6 @@ async function persistirAprendizaje(usuario: Usuario, interp: Interpretacion): P
     campos.tono = interp.tono;
     usuario.tono = interp.tono;
   }
-
   try {
     if (Object.keys(campos).length > 0) {
       await updateUsuario(usuario.phone, campos);
@@ -239,5 +292,18 @@ async function persistirAprendizaje(usuario: Usuario, interp: Interpretacion): P
     }
   } catch (err) {
     console.error('[abakus][aprendizaje] No se pudo persistir el aprendizaje:', err);
+  }
+
+  // Moneda aparte: solo si la persona mencionó una soportada y distinta a la
+  // actual. En su propio try/catch para que una columna `moneda` aún no migrada
+  // no bloquee el resto del aprendizaje.
+  const monedaDetectada = interp.moneda?.toUpperCase();
+  if (monedaDetectada && esMonedaSoportada(monedaDetectada) && monedaDetectada !== usuario.moneda) {
+    usuario.moneda = monedaDetectada;
+    try {
+      await updateUsuario(usuario.phone, { moneda: monedaDetectada });
+    } catch (err) {
+      console.error('[abakus][moneda] No se pudo persistir la moneda:', err);
+    }
   }
 }

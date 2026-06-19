@@ -1,6 +1,7 @@
 import ExcelJS from 'exceljs';
 import { CuentaPorCobrar, Movimiento } from '../types';
 import { Periodo } from './periodo';
+import { formatMonto } from '../utils/format';
 
 // Colores de marca Abakus
 const COLOR_HEADER = '1B2A4A';   // Azul marino oscuro
@@ -10,10 +11,6 @@ const COLOR_BALANCE_POS = '1A7A3F';
 const COLOR_BALANCE_NEG = 'C0392B';
 const COLOR_ACCENT = 'F0F4F8';   // Gris claro filas alternas
 const COLOR_TOTAL_BG = 'DDE3EA'; // Gris total
-
-function clpStr(monto: number): string {
-  return `$${Math.round(monto).toLocaleString('es-CL')}`;
-}
 
 function fechaStr(iso: string): string {
   const [y, m, d] = iso.split('-');
@@ -38,6 +35,7 @@ export async function generarReporteExcel(
   cuentas: CuentaPorCobrar[],
   periodo: Periodo,
   nombreUsuario: string | null,
+  moneda?: string | null,
 ): Promise<Buffer> {
   const wb = new ExcelJS.Workbook();
   wb.creator = 'Abakus';
@@ -49,10 +47,10 @@ export async function generarReporteExcel(
   const totalEgresos = egresos.reduce((s, m) => s + Number(m.monto), 0);
   const balance = totalIngresos - totalEgresos;
 
-  agregarHojaResumen(wb, periodo, nombreUsuario, totalIngresos, totalEgresos, balance, movimientos);
-  agregarHojaMovimientos(wb, movimientos, periodo);
+  agregarHojaResumen(wb, periodo, nombreUsuario, totalIngresos, totalEgresos, balance, movimientos, moneda);
+  agregarHojaMovimientos(wb, movimientos, periodo, moneda);
   if (cuentas.length > 0) {
-    agregarHojaCuentas(wb, cuentas);
+    agregarHojaCuentas(wb, cuentas, moneda);
   }
 
   const buf = await wb.xlsx.writeBuffer();
@@ -67,7 +65,9 @@ function agregarHojaResumen(
   totalEgresos: number,
   balance: number,
   movimientos: Movimiento[],
+  moneda?: string | null,
 ): void {
+  const f = (n: number) => formatMonto(n, moneda);
   const ws = wb.addWorksheet('Resumen');
   ws.columns = [
     { width: 28 },
@@ -121,7 +121,7 @@ function agregarHojaResumen(
     ws.getRow(5).height = 24;
 
     const montoCell = ws.getCell(`${colNext}6`);
-    montoCell.value = clpStr(monto);
+    montoCell.value = f(monto);
     montoCell.font = cellFont(true, color, 14);
     montoCell.alignment = { horizontal: 'center', vertical: 'middle' };
     montoCell.fill = fillSolid('F8FAFB');
@@ -156,7 +156,7 @@ function agregarHojaResumen(
     let rowIdx = 0;
     for (const [cat, { ingresos: ing, egresos: egr }] of categorias) {
       const neto = ing - egr;
-      const row = ws.addRow([cat, clpStr(ing), clpStr(egr), clpStr(neto)]);
+      const row = ws.addRow([cat, f(ing), f(egr), f(neto)]);
       row.eachCell((cell, col) => {
         cell.fill = fillSolid(rowIdx % 2 === 0 ? 'FFFFFF' : COLOR_ACCENT);
         cell.border = border();
@@ -172,7 +172,7 @@ function agregarHojaResumen(
     }
 
     // Total row
-    const totalRow = ws.addRow(['TOTAL', clpStr(totalIngresos), clpStr(totalEgresos), clpStr(balance)]);
+    const totalRow = ws.addRow(['TOTAL', f(totalIngresos), f(totalEgresos), f(balance)]);
     totalRow.eachCell((cell, col) => {
       cell.font = cellFont(true, col === 4 ? (balance >= 0 ? COLOR_INCOME : COLOR_EXPENSE) : COLOR_HEADER, 10);
       cell.fill = fillSolid(COLOR_TOTAL_BG);
@@ -190,7 +190,13 @@ function agregarHojaResumen(
   footer.getCell(1).alignment = { horizontal: 'center' };
 }
 
-function agregarHojaMovimientos(wb: ExcelJS.Workbook, movimientos: Movimiento[], periodo: Periodo): void {
+function agregarHojaMovimientos(
+  wb: ExcelJS.Workbook,
+  movimientos: Movimiento[],
+  periodo: Periodo,
+  moneda?: string | null,
+): void {
+  const f = (n: number) => formatMonto(n, moneda);
   const ws = wb.addWorksheet('Movimientos');
   ws.columns = [
     { key: 'num', width: 8 },
@@ -228,7 +234,7 @@ function agregarHojaMovimientos(wb: ExcelJS.Workbook, movimientos: Movimiento[],
       m.correlativo != null ? `#${m.correlativo}` : '—',
       fechaStr(m.fecha),
       esIngreso ? '💰 Ingreso' : '💸 Egreso',
-      clpStr(Number(m.monto)),
+      f(Number(m.monto)),
       m.categoria ?? '—',
       m.descripcion ?? '—',
     ]);
@@ -315,7 +321,12 @@ export async function generarPlantillaExcel(): Promise<Buffer> {
   return Buffer.from(buf);
 }
 
-function agregarHojaCuentas(wb: ExcelJS.Workbook, cuentas: CuentaPorCobrar[]): void {
+function agregarHojaCuentas(
+  wb: ExcelJS.Workbook,
+  cuentas: CuentaPorCobrar[],
+  moneda?: string | null,
+): void {
+  const f = (n: number) => formatMonto(n, moneda);
   const ws = wb.addWorksheet('Cuentas por Cobrar');
   ws.columns = [
     { width: 24 },
@@ -349,7 +360,7 @@ function agregarHojaCuentas(wb: ExcelJS.Workbook, cuentas: CuentaPorCobrar[]): v
   pendientes.forEach((c, i) => {
     const row = ws.addRow([
       c.contraparte ?? 'Sin nombre',
-      clpStr(Number(c.monto)),
+      f(Number(c.monto)),
       c.fecha_vencimiento ? fechaStr(c.fecha_vencimiento) : '—',
       '⏳ Pendiente',
       c.descripcion ?? '—',
@@ -363,7 +374,7 @@ function agregarHojaCuentas(wb: ExcelJS.Workbook, cuentas: CuentaPorCobrar[]): v
     row.height = 17;
   });
 
-  const totalRow = ws.addRow(['TOTAL PENDIENTE', clpStr(total), '', '', '']);
+  const totalRow = ws.addRow(['TOTAL PENDIENTE', f(total), '', '', '']);
   totalRow.eachCell((cell, col) => {
     cell.font = cellFont(true, col <= 2 ? COLOR_EXPENSE : '333333', 10);
     cell.fill = fillSolid(COLOR_TOTAL_BG);

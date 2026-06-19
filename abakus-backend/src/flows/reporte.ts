@@ -3,6 +3,7 @@ import { getMovimientosPeriodo, getCuentasPendientes } from '../supabase/queries
 import { generarReporteExcel } from '../reports/excel';
 import { parsearPeriodo } from '../reports/periodo';
 import { sendText, sendDocument } from '../whatsapp/sender';
+import { formatMonto } from '../utils/format';
 
 /**
  * Genera y envía el reporte Excel al usuario.
@@ -16,7 +17,7 @@ export async function handleReporte(user: Usuario, textoOriginal: string): Promi
     getCuentasPendientes(user.phone),
   ]);
 
-  const buffer = await generarReporteExcel(movimientos, cuentas, periodo, user.nombre);
+  const buffer = await generarReporteExcel(movimientos, cuentas, periodo, user.nombre, user.moneda);
 
   const filename = `abakus-reporte-${periodo.label.toLowerCase().replace(' ', '-')}.xlsx`;
 
@@ -36,11 +37,12 @@ export async function handleReporte(user: Usuario, textoOriginal: string): Promi
   const balance = totalIngresos - totalEgresos;
 
   const signo = balance >= 0 ? '+' : '';
+  const f = (n: number) => formatMonto(n, user.moneda);
   await sendText(
     user.phone,
     `✅ Reporte de *${periodo.label}* listo.\n\n` +
-      `💰 Ingresos: $${Math.round(totalIngresos).toLocaleString('es-CL')}\n` +
-      `💸 Egresos: $${Math.round(totalEgresos).toLocaleString('es-CL')}\n` +
-      `🧮 Balance: ${signo}$${Math.round(Math.abs(balance)).toLocaleString('es-CL')}`,
+      `💰 Ingresos: ${f(totalIngresos)}\n` +
+      `💸 Egresos: ${f(totalEgresos)}\n` +
+      `🧮 Balance: ${signo}${f(Math.abs(balance))}`,
   );
 }

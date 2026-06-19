@@ -1,7 +1,7 @@
 import { getUsuariosActivos, getCuentasPorVencer, marcarRecordatorioEnviado } from '../supabase/queries';
 import { sendText } from '../whatsapp/sender';
 import { accesoVigente } from '../flows/suscripcion';
-import { clp } from '../utils/format';
+import { formatMonto } from '../utils/format';
 import { Usuario } from '../types';
 
 const DIAS_AVISO = 3;
@@ -27,7 +27,7 @@ export async function enviarRecordatorios(): Promise<void> {
       const lineas = cuentas.map((c) => {
         const dias = diasHasta(c.fecha_vencimiento!);
         const cuandoLabel = dias === 0 ? 'hoy' : dias === 1 ? 'mañana' : `en ${dias} días`;
-        return `• ${c.contraparte ?? 'Sin nombre'}: ${clp(Number(c.monto))} _(vence ${cuandoLabel})_`;
+        return `• ${c.contraparte ?? 'Sin nombre'}: ${formatMonto(Number(c.monto), user.moneda)} _(vence ${cuandoLabel})_`;
       }).join('\n');
 
       const plural = cuentas.length > 1 ? 'cuentas por cobrar que vencen' : 'cuenta por cobrar que vence';

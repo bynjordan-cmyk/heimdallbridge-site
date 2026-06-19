@@ -1,6 +1,6 @@
 import { Movimiento, Usuario } from '../types';
 import { getCuentasPendientes, getMovimientosPeriodo, setMeta } from '../supabase/queries';
-import { clp } from '../utils/format';
+import { formatMonto } from '../utils/format';
 import {
   diferenciaMeses,
   mesActual,
@@ -77,6 +77,7 @@ export async function handleComando(
   comando: ComandoEspecial,
   textoOriginal?: string,
 ): Promise<string> {
+  const f = (n: number) => formatMonto(n, user.moneda);
   if (comando === 'ayuda') return AYUDA;
 
   // Manejados directamente en handler.ts
@@ -99,7 +100,7 @@ export async function handleComando(
     const esMesActual = !tieneMes(t);
     const periodo = esMesActual ? mesActual() : parsearPeriodo(t);
     const movs = await getMovimientosPeriodo(user.phone, periodo.desde, periodo.hasta);
-    return formatearResumen(movs, periodo.label, esMesActual, esMesActual ? user.meta_mensual : null);
+    return formatearResumen(movs, periodo.label, esMesActual, esMesActual ? user.meta_mensual : null, user.moneda);
   }
 
   // comando === 'cobros'
@@ -111,15 +112,16 @@ export async function handleComando(
   const lineas = cuentas
     .map((c) => {
       const vence = c.fecha_vencimiento ? ` (vence ${c.fecha_vencimiento})` : '';
-      return `• ${c.contraparte ?? 'Sin contraparte'}: ${clp(Number(c.monto))}${vence}`;
+      return `• ${c.contraparte ?? 'Sin contraparte'}: ${f(Number(c.monto))}${vence}`;
     })
     .join('\n');
 
   const total = cuentas.reduce((acc, c) => acc + Number(c.monto), 0);
-  return `📋 *Cuentas por cobrar pendientes*\n${lineas}\n\nTotal: ${clp(total)}`;
+  return `📋 *Cuentas por cobrar pendientes*\n${lineas}\n\nTotal: ${f(total)}`;
 }
 
 async function handleMeta(user: Usuario, textoOriginal: string): Promise<string> {
+  const f = (n: number) => formatMonto(n, user.moneda);
   // Extraer número del texto (ignora puntos y comas de miles)
   const limpio = textoOriginal.replace(/[$.]/g, '').replace(',', '');
   const match = limpio.match(/\d+/);
@@ -132,7 +134,7 @@ async function handleMeta(user: Usuario, textoOriginal: string): Promise<string>
       const ingresos = movs.filter((m) => m.tipo === 'ingreso').reduce((s, m) => s + Number(m.monto), 0);
       const pct = Math.round((ingresos / user.meta_mensual) * 100);
       const barra = progresoBarra(pct);
-      return `🎯 *Tu meta mensual:* ${clp(user.meta_mensual)}\nProgreso: ${clp(ingresos)} ${barra} ${pct}%\n\nPara cambiarla escribe: *meta [monto]*`;
+      return `🎯 *Tu meta mensual:* ${f(user.meta_mensual)}\nProgreso: ${f(ingresos)} ${barra} ${pct}%\n\nPara cambiarla escribe: *meta [monto]*`;
     }
     return `🎯 Aún no tienes una meta mensual.\n\nEscríbeme algo como:\n*meta 1500000*\n\nY te mostraré tu progreso cada vez que consultes el resumen.`;
   }
@@ -143,7 +145,7 @@ async function handleMeta(user: Usuario, textoOriginal: string): Promise<string>
   }
 
   await setMeta(user.phone, monto);
-  return `🎯 ¡Meta mensual actualizada!\nObjetivo: *${clp(monto)}/mes*\n\nEscribe *resumen* para ver tu progreso. 💪`;
+  return `🎯 ¡Meta mensual actualizada!\nObjetivo: *${f(monto)}/mes*\n\nEscribe *resumen* para ver tu progreso. 💪`;
 }
 
 /**
@@ -152,17 +154,18 @@ async function handleMeta(user: Usuario, textoOriginal: string): Promise<string>
  * datos. Si ya pasó, simplemente muestra el resumen real (no es proyección).
  */
 async function handleProyeccion(user: Usuario, textoOriginal: string): Promise<string> {
+  const f = (n: number) => formatMonto(n, user.moneda);
   const objetivo = parsearMesObjetivo(textoOriginal) ?? periodoMesesAtras(-1);
   const delta = diferenciaMeses(objetivo);
 
   if (delta < 0) {
     const movs = await getMovimientosPeriodo(user.phone, objetivo.desde, objetivo.hasta);
-    return `_${objetivo.label} ya pasó, así que este es el resultado real (no una proyección):_\n\n${formatearResumen(movs, objetivo.label, false)}`;
+    return `_${objetivo.label} ya pasó, así que este es el resultado real (no una proyección):_\n\n${formatearResumen(movs, objetivo.label, false, null, user.moneda)}`;
   }
 
   if (delta === 0) {
     const movs = await getMovimientosPeriodo(user.phone, objetivo.desde, objetivo.hasta);
-    return formatearResumen(movs, objetivo.label, true, user.meta_mensual);
+    return formatearResumen(movs, objetivo.label, true, user.meta_mensual, user.moneda);
   }
 
   // Mes futuro: promedio de los últimos 3 meses con movimientos.
@@ -190,10 +193,11 @@ async function handleProyeccion(user: Usuario, textoOriginal: string): Promise<s
   const balanceProy = ingresosProy - egresosProy;
   const signo = balanceProy >= 0 ? '+' : '-';
 
-  return `🔮 *Proyección para ${objetivo.label}*\n_(estimado según el promedio de tus últimos ${conDatos.length} mes${conDatos.length !== 1 ? 'es' : ''} con movimientos)_\n\n💰 Ingresos: ~${clp(ingresosProy)}\n💸 Egresos: ~${clp(egresosProy)}\n🧮 Balance: ${signo}${clp(Math.abs(balanceProy))}`;
+  return `🔮 *Proyección para ${objetivo.label}*\n_(estimado según el promedio de tus últimos ${conDatos.length} mes${conDatos.length !== 1 ? 'es' : ''} con movimientos)_\n\n💰 Ingresos: ~${f(ingresosProy)}\n💸 Egresos: ~${f(egresosProy)}\n🧮 Balance: ${signo}${f(Math.abs(balanceProy))}`;
 }
 
 async function handleComparativo(user: Usuario): Promise<string> {
+  const f = (n: number) => formatMonto(n, user.moneda);
   const actual = mesActual();
   const pasado = mesPasado();
 
@@ -215,7 +219,7 @@ async function handleComparativo(user: Usuario): Promise<string> {
   const delta = (actual: number, pasado: number) => {
     const diff = actual - pasado;
     const signo = diff >= 0 ? '+' : '';
-    return diff !== 0 ? ` (${signo}${clp(diff)})` : '';
+    return diff !== 0 ? ` (${signo}${f(diff)})` : '';
   };
 
   const tendencia = (actual: number, pasado: number, mayorEsMejor = true) => {
@@ -228,9 +232,9 @@ async function handleComparativo(user: Usuario): Promise<string> {
 
   return `📊 *${actual.label} vs ${pasado.label}*
 
-💰 Ingresos: ${clp(a.ingresos)}${delta(a.ingresos, p.ingresos)}${tendencia(a.ingresos, p.ingresos)}
-💸 Egresos: ${clp(a.egresos)}${delta(a.egresos, p.egresos)}${tendencia(a.egresos, p.egresos, false)}
-🧮 Balance: ${clp(balanceActual)}${delta(balanceActual, balancePasado)}${tendencia(balanceActual, balancePasado)}`;
+💰 Ingresos: ${f(a.ingresos)}${delta(a.ingresos, p.ingresos)}${tendencia(a.ingresos, p.ingresos)}
+💸 Egresos: ${f(a.egresos)}${delta(a.egresos, p.egresos)}${tendencia(a.egresos, p.egresos, false)}
+🧮 Balance: ${f(balanceActual)}${delta(balanceActual, balancePasado)}${tendencia(balanceActual, balancePasado)}`;
 }
 
 function progresoBarra(pct: number): string {
@@ -243,12 +247,14 @@ export function formatearResumen(
   label: string,
   esMesActual = false,
   meta?: number | null,
+  moneda?: string | null,
 ): string {
+  const f = (n: number) => formatMonto(n, moneda);
   const ingresos = movs.filter((m) => m.tipo === 'ingreso').reduce((s, m) => s + Number(m.monto), 0);
   const egresos = movs.filter((m) => m.tipo === 'egreso').reduce((s, m) => s + Number(m.monto), 0);
   const balance = ingresos - egresos;
 
-  let msg = `📊 *Resumen ${label}*\n💰 Ingresos: ${clp(ingresos)}\n💸 Egresos: ${clp(egresos)}\n🧮 Balance: ${balance >= 0 ? '' : '-'}${clp(Math.abs(balance))}`;
+  let msg = `📊 *Resumen ${label}*\n💰 Ingresos: ${f(ingresos)}\n💸 Egresos: ${f(egresos)}\n🧮 Balance: ${balance >= 0 ? '' : '-'}${f(Math.abs(balance))}`;
 
   // Proyección de cierre: siempre en el mes actual (no depende de meta).
   if (esMesActual && ingresos > 0) {
@@ -260,7 +266,7 @@ export function formatearResumen(
       const proyEgresos = Math.round((egresos / dia) * diasMes);
       const proyBalance = proyIngresos - proyEgresos;
       const signo = proyBalance >= 0 ? '+' : '-';
-      msg += `\n\n🔮 *Proyección al cierre del mes:*\n  💰 Ingresos: ~${clp(proyIngresos)}\n  💸 Egresos: ~${clp(proyEgresos)}\n  🧮 Balance: ${signo}${clp(Math.abs(proyBalance))}`;
+      msg += `\n\n🔮 *Proyección al cierre del mes:*\n  💰 Ingresos: ~${f(proyIngresos)}\n  💸 Egresos: ~${f(proyEgresos)}\n  🧮 Balance: ${signo}${f(Math.abs(proyBalance))}`;
     }
   }
 
@@ -269,7 +275,7 @@ export function formatearResumen(
     const pct = Math.round((ingresos / meta) * 100);
     const barra = progresoBarra(pct);
     const emoji = ingresos >= meta ? '🎉' : '🎯';
-    msg += `\n\n${emoji} *Meta:* ${clp(ingresos)} / ${clp(meta)} ${barra} ${pct}%`;
+    msg += `\n\n${emoji} *Meta:* ${f(ingresos)} / ${f(meta)} ${barra} ${pct}%`;
   }
 
   // Desglose por categoría (solo egresos con categoría, top 5)
@@ -283,7 +289,7 @@ export function formatearResumen(
     const top = [...cats.entries()]
       .sort((a, b) => b[1] - a[1])
       .slice(0, 5);
-    const desglose = top.map(([cat, total]) => `  • ${cat}: ${clp(total)}`).join('\n');
+    const desglose = top.map(([cat, total]) => `  • ${cat}: ${f(total)}`).join('\n');
     msg += `\n\n📁 *Egresos por categoría:*\n${desglose}`;
   }
 

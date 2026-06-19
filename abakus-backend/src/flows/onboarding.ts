@@ -1,25 +1,62 @@
 import { createUsuario } from '../supabase/queries';
-import { config } from '../config';
+import { Usuario } from '../types';
+import { formatMonto, monedaPorTelefono } from '../utils/format';
 
-const BIENVENIDA = (nombre: string | null) => {
+/**
+ * Estado de conversación durante el onboarding guiado: el usuario acaba de
+ * recibir la bienvenida y le preguntamos a qué se dedica. Su respuesta la
+ * captura el aprendizaje (campo `negocio`), y luego lo invitamos al primer
+ * registro. Es un paso liviano: si en vez de responder registra algo o usa un
+ * comando, no lo bloqueamos (el handler limpia el estado y sigue de largo).
+ */
+export const ONB_NEGOCIO = 'onboarding_negocio';
+
+/** ¿El usuario está en el paso "cuéntame a qué te dedicas" del onboarding? */
+export function enOnboarding(user: Usuario): boolean {
+  return user.estado_conversacion === ONB_NEGOCIO;
+}
+
+const BIENVENIDA = (nombre: string | null): string => {
   const saludo = nombre ? `¡Hola, ${nombre.split(' ')[0]}! 👋` : '¡Hola! 👋';
-  const pago = config.pago.mercadopagoLink
-    ? `\n\n💳 Para activar tu plan cuando quieras, escribe *suscribirme*.`
-    : '';
-  return `${saludo} Soy *Abakus* 🧮, tu asistente financiero personal por WhatsApp.
+  return `${saludo} Soy *Abakus* 🧮, tu asistente financiero por WhatsApp.
 
-Te ayudo a llevar el control de tus ingresos, gastos y cuentas por cobrar sin apps ni Excel — solo escríbeme en lenguaje natural.
+Llevo el control de tus ingresos, gastos y cuentas por cobrar — solo escríbeme en lenguaje natural, sin apps ni planillas. 🙌
 
-Puedes decirme cosas como:
+Para personalizar tu experiencia, cuéntame: *¿a qué te dedicas?*
+_(o escribe *saltar* para empezar de una vez)_`;
+};
+
+/**
+ * Mensaje del segundo paso: invita a registrar el primer movimiento y deja claro
+ * que se pueden cargar varios de una sola vez (carga inicial sin Excel).
+ */
+export function invitacionPrimerRegistro(user: Usuario): string {
+  const intro = user.negocio
+    ? `¡Genial! 🙌 Tomo nota.`
+    : `¡Perfecto! 🙌`;
+
+  const moneda = user.moneda ?? 'CLP';
+  const ejemplo = formatMonto(80000, moneda);
+
+  return `${intro} Probemos ahora: escríbeme tu *primer movimiento* en lenguaje natural. Por ejemplo:
+
 💰 _"vendí 80000 en diseño web"_
 💸 _"pagué 15000 de internet"_
 📋 _"Carlos me debe 50000 hasta el viernes"_
-📊 _"resumen"_ → tu balance del mes${pago}
 
-¿Qué quieres registrar hoy?`;
-};
+💡 ¿Quieres traer lo de estos días de una vez? Mándamelos todos juntos en un mensaje:
+_"vendí 50 mil el lunes, pagué 20 mil de arriendo y gasté 8 mil en bencina"_
 
-export async function handleOnboarding(phone: string, nombre: string | null): Promise<string> {
-  await createUsuario(phone, nombre);
+💱 Registraré tus montos en *${moneda}* (ej. ${ejemplo}). Si usas otra moneda, solo dímelo (ej. _"uso dólares"_).
+
+Cuando quieras tu balance, escribe *resumen*. Y *ayuda* para ver todo lo que puedo hacer.`;
+}
+
+/**
+ * Paso 1: usuario nuevo. Crea el registro (en onboarding), infiriendo la moneda
+ * del prefijo telefónico, y devuelve la bienvenida.
+ */
+export async function iniciarOnboarding(phone: string, nombre: string | null): Promise<string> {
+  await createUsuario(phone, nombre, ONB_NEGOCIO, monedaPorTelefono(phone));
   return BIENVENIDA(nombre);
 }

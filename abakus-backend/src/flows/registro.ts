@@ -1,10 +1,11 @@
-import { Interpretacion, Usuario } from '../types';
+import { Interpretacion, MovimientoInterpretado, Usuario } from '../types';
 import {
   contarCuentasPendientes,
   eliminarMovimiento,
   actualizarMovimiento,
   insertCuentaPorCobrar,
   insertMovimiento,
+  insertMovimientosMasivo,
   marcarCobrado,
   getMovimientosPeriodo,
 } from '../supabase/queries';
@@ -13,7 +14,7 @@ import {
 function refTag(correlativo: number | null): string {
   return correlativo != null ? ` #${correlativo}` : '';
 }
-import { clp } from '../utils/format';
+import { formatMonto } from '../utils/format';
 import { mesActual } from '../reports/periodo';
 
 const LIMITE_CUENTAS_BASICO = 3;
@@ -21,8 +22,8 @@ const LIMITE_CUENTAS_BASICO = 3;
 export async function handleRegistro(
   user: Usuario,
   interp: Interpretacion,
-  textoOriginal: string,
 ): Promise<string> {
+  const f = (n: number) => formatMonto(n, user.moneda);
 
   // === Marcar deuda como cobrada ===
   if (interp.tipo === 'cobro') {
@@ -31,7 +32,7 @@ export async function handleRegistro(
       const quien = interp.contraparte ? `de *${interp.contraparte}*` : 'pendiente';
       return `Mmm, no encontré ninguna cuenta ${quien} activa 🤔 ¿Ya la habías marcado antes?`;
     }
-    return `✅ ¡Cobro registrado!\n👤 ${cuenta.contraparte ?? 'Sin contraparte'} | ${clp(Number(cuenta.monto))} marcado como *pagado*. 🎉`;
+    return `✅ ¡Cobro registrado!\n👤 ${cuenta.contraparte ?? 'Sin contraparte'} | ${f(Number(cuenta.monto))} marcado como *pagado*. 🎉`;
   }
 
   // === Corregir un movimiento (por #referencia o el último) ===
@@ -51,7 +52,7 @@ export async function handleRegistro(
     const { anterior, actualizado } = res;
     const cambios: string[] = [];
     if (Number(anterior.monto) !== Number(actualizado.monto)) {
-      cambios.push(`💲 Monto: ${clp(Number(anterior.monto))} → *${clp(Number(actualizado.monto))}*`);
+      cambios.push(`💲 Monto: ${f(Number(anterior.monto))} → *${f(Number(actualizado.monto))}*`);
     }
     if ((anterior.categoria ?? '') !== (actualizado.categoria ?? '')) {
       cambios.push(`🏷️ Categoría: ${anterior.categoria ?? '—'} → *${actualizado.categoria ?? '—'}*`);
@@ -78,50 +79,16 @@ export async function handleRegistro(
         ? `No encontré el movimiento #${interp.referencia} 🤔`
         : 'No encontré movimientos recientes para borrar 🤔';
     }
-    const detalle = [clp(Number(mov.monto)), mov.categoria, mov.descripcion]
+    const detalle = [f(Number(mov.monto)), mov.categoria, mov.descripcion]
       .filter(Boolean)
       .join(' | ');
     const emoji = mov.tipo === 'ingreso' ? '💰' : '💸';
     return `🗑️ Listo, borré el movimiento${refTag(mov.correlativo)}:\n${emoji} ${detalle}`;
   }
 
-  // === Registro de monto requerido ===
+  // === Deuda (cuenta por cobrar) requiere monto ===
   if (interp.monto === null) {
     return 'Entendí que quieres registrar algo, pero no detecté el monto 🤔 ¿Cuánto fue?';
-  }
-
-  if (interp.tipo === 'ingreso' || interp.tipo === 'egreso') {
-    const nuevo = await insertMovimiento({
-      userPhone: user.phone,
-      tipo: interp.tipo,
-      monto: interp.monto,
-      categoria: interp.categoria,
-      descripcion: interp.descripcion,
-      rawMessage: textoOriginal,
-    });
-
-    const detalle = [clp(interp.monto), interp.categoria, interp.descripcion]
-      .filter(Boolean)
-      .join(' | ');
-    const ref = refTag(nuevo.correlativo);
-
-    if (interp.tipo === 'ingreso') {
-      const tip = tipIngreso(interp.monto);
-      return `✅ Ingreso registrado${ref}\n💰 ${detalle}${tip}`;
-    }
-
-    // Egreso: calcular balance del mes y alertar si es negativo
-    const periodo = mesActual();
-    const movs = await getMovimientosPeriodo(user.phone, periodo.desde, periodo.hasta);
-    const totalIngresos = movs.filter((m) => m.tipo === 'ingreso').reduce((s, m) => s + Number(m.monto), 0);
-    const totalEgresos = movs.filter((m) => m.tipo === 'egreso').reduce((s, m) => s + Number(m.monto), 0);
-    const balance = totalIngresos - totalEgresos;
-
-    const alertaBalance = balance < 0
-      ? `\n\n⚠️ _Balance del mes: -${clp(Math.abs(balance))}. Escribe *resumen* para ver el detalle._`
-      : '';
-
-    return `📤 Egreso registrado${ref}\n💸 ${detalle}${alertaBalance}`;
   }
 
   // tipo === 'deuda' → cuenta por cobrar
@@ -144,7 +111,100 @@ export async function handleRegistro(
   const vence = interp.fecha_vencimiento ? ` | vence ${interp.fecha_vencimiento}` : '';
   return `📋 Cuenta por cobrar registrada\n👤 ${
     interp.contraparte ?? 'Sin contraparte'
-  } | ${clp(interp.monto)}${vence}`;
+  } | ${f(interp.monto)}${vence}`;
+}
+
+/** Fecha de hoy en YYYY-MM-DD (default cuando el movimiento no trae fecha). */
+function hoyISO(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+/** Cierre celebratorio cuando es el PRIMER movimiento del usuario (correlativo #1). */
+const PRIMERA_VICTORIA =
+  '\n\n🎉 *¡Ese fue tu primer registro en Abakus!* Así de fácil: solo escríbeme y yo llevo la cuenta. 💪';
+
+/**
+ * Registra uno o varios ingresos/egresos detectados en un mismo mensaje.
+ * - 1 movimiento: confirmación detallada (con tip o alerta de balance).
+ * - Varios: los inserta en lote y responde con un resumen.
+ * En ambos casos celebra si fue el primer movimiento del usuario (#1).
+ */
+export async function registrarMovimientos(
+  user: Usuario,
+  items: MovimientoInterpretado[],
+  textoOriginal: string,
+): Promise<string> {
+  const f = (n: number) => formatMonto(n, user.moneda);
+  if (items.length === 1) {
+    return confirmarMovimientoUnico(user, items[0], textoOriginal);
+  }
+
+  const insertados = await insertMovimientosMasivo(
+    user.phone,
+    items.map((m) => ({
+      tipo: m.tipo,
+      monto: m.monto,
+      categoria: m.categoria,
+      descripcion: m.descripcion,
+      fecha: m.fecha ?? hoyISO(),
+    })),
+    textoOriginal,
+  );
+
+  const ingresos = items.filter((m) => m.tipo === 'ingreso');
+  const egresos = items.filter((m) => m.tipo === 'egreso');
+  const totalIngresos = ingresos.reduce((s, m) => s + m.monto, 0);
+  const totalEgresos = egresos.reduce((s, m) => s + m.monto, 0);
+
+  let msg = `✅ *Registré ${items.length} movimientos*`;
+  if (ingresos.length > 0) msg += `\n💰 Ingresos: ${f(totalIngresos)} (${ingresos.length})`;
+  if (egresos.length > 0) msg += `\n💸 Egresos: ${f(totalEgresos)} (${egresos.length})`;
+  msg += `\n\nEscribe *resumen* para ver tu balance actualizado.`;
+
+  if (insertados.some((m) => m.correlativo === 1)) {
+    msg += PRIMERA_VICTORIA;
+  }
+  return msg;
+}
+
+/** Confirmación detallada para un único ingreso/egreso. */
+async function confirmarMovimientoUnico(
+  user: Usuario,
+  item: MovimientoInterpretado,
+  textoOriginal: string,
+): Promise<string> {
+  const f = (n: number) => formatMonto(n, user.moneda);
+  const nuevo = await insertMovimiento({
+    userPhone: user.phone,
+    tipo: item.tipo,
+    monto: item.monto,
+    categoria: item.categoria,
+    descripcion: item.descripcion,
+    rawMessage: textoOriginal,
+    fecha: item.fecha,
+  });
+
+  const detalle = [f(item.monto), item.categoria, item.descripcion].filter(Boolean).join(' | ');
+  const ref = refTag(nuevo.correlativo);
+  const victoria = nuevo.correlativo === 1 ? PRIMERA_VICTORIA : '';
+
+  if (item.tipo === 'ingreso') {
+    const tip = tipIngreso(item.monto);
+    return `✅ Ingreso registrado${ref}\n💰 ${detalle}${tip}${victoria}`;
+  }
+
+  // Egreso: calcular balance del mes y alertar si es negativo.
+  const periodo = mesActual();
+  const movs = await getMovimientosPeriodo(user.phone, periodo.desde, periodo.hasta);
+  const totalIngresos = movs.filter((m) => m.tipo === 'ingreso').reduce((s, m) => s + Number(m.monto), 0);
+  const totalEgresos = movs.filter((m) => m.tipo === 'egreso').reduce((s, m) => s + Number(m.monto), 0);
+  const balance = totalIngresos - totalEgresos;
+
+  const alertaBalance = balance < 0
+    ? `\n\n⚠️ _Balance del mes: -${f(Math.abs(balance))}. Escribe *resumen* para ver el detalle._`
+    : '';
+
+  return `📤 Egreso registrado${ref}\n💸 ${detalle}${alertaBalance}${victoria}`;
 }
 
 const TIPS_IVA = [

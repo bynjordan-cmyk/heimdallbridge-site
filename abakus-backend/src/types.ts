@@ -8,6 +8,9 @@ export interface Usuario {
   activo: boolean | null;
   negocio: string | null;
   tono: string | null;
+  // Moneda del usuario (ISO 4217: 'CLP', 'MXN', 'PEN', 'USD'...). Una por usuario.
+  // Se infiere del prefijo telefónico y se ajusta si la persona menciona otra.
+  moneda: string | null;
   onboarding_step: number | null;
   trial_ends_at: string | null;
   email: string | null;
@@ -53,6 +56,19 @@ export interface CuentaPorCobrar {
 
 export type TipoInterpretacion = 'ingreso' | 'egreso' | 'consulta' | 'deuda' | 'cobro' | 'eliminar' | 'corregir' | 'desconocido';
 
+/**
+ * Un ingreso o egreso individual detectado dentro de un mensaje. Un solo mensaje
+ * puede contener varios ("vendí 50k el lunes, pagué 20k de arriendo, cobré 30k"),
+ * por lo que la interpretación devuelve una lista en `Interpretacion.movimientos`.
+ */
+export interface MovimientoInterpretado {
+  tipo: TipoMovimiento; // ingreso | egreso
+  monto: number;
+  categoria: string | null;
+  descripcion: string | null;
+  fecha: string | null; // YYYY-MM-DD si el usuario la menciona; null = hoy
+}
+
 export interface Interpretacion {
   tipo: TipoInterpretacion;
   nombre: string | null;
@@ -62,12 +78,18 @@ export interface Interpretacion {
   contraparte: string | null;
   fecha_vencimiento: string | null;
   respuesta: string;
+  // Ingresos/egresos detectados en el mensaje (0, 1 o varios). Vacío para
+  // consulta/deuda/cobro/eliminar/corregir/desconocido.
+  movimientos: MovimientoInterpretado[];
   // Correlativo del movimiento referido por el usuario (ej. "corrige el #5").
   referencia: number | null;
   // ===== Aprendizaje: datos que Claude extrae para recordar =====
   negocio: string | null;      // a qué se dedica el usuario, si lo revela
   tono: string | null;         // preferencia de estilo, si la pide explícitamente
   aprendizaje: string | null;  // dato durable nuevo a recordar (o null)
+  // Moneda (ISO 4217) que el usuario menciona o revela explícitamente en este
+  // mensaje (ej. "uso dólares", "cobré 100 soles"). null si no la menciona.
+  moneda: string | null;
 }
 
 // ===== Mensaje entrante ya normalizado =====

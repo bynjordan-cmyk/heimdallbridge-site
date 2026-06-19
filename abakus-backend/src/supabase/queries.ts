@@ -12,14 +12,29 @@ export async function getUsuarioByPhone(phone: string): Promise<Usuario | null> 
   return (data as Usuario | null) ?? null;
 }
 
-export async function createUsuario(phone: string, nombre: string | null): Promise<Usuario> {
-  const { data, error } = await supabase
-    .from('usuarios')
-    .insert({ phone, nombre })
-    .select()
-    .single();
+export async function createUsuario(
+  phone: string,
+  nombre: string | null,
+  estadoConversacion: string | null = null,
+  moneda: string | null = null,
+): Promise<Usuario> {
+  const fila: Record<string, unknown> = { phone, nombre };
+  if (estadoConversacion !== null) fila.estado_conversacion = estadoConversacion;
+  if (moneda !== null) fila.moneda = moneda;
 
-  if (error) throw error;
+  const { data, error } = await supabase.from('usuarios').insert(fila).select().single();
+
+  if (error) {
+    // Degrada con gracia si la columna `moneda` aún no existe en la DB:
+    // reintenta sin ella para no romper el alta del usuario (onboarding).
+    if (moneda !== null) {
+      delete fila.moneda;
+      const retry = await supabase.from('usuarios').insert(fila).select().single();
+      if (retry.error) throw retry.error;
+      return retry.data as Usuario;
+    }
+    throw error;
+  }
   return data as Usuario;
 }
 
@@ -27,7 +42,7 @@ export async function createUsuario(phone: string, nombre: string | null): Promi
 export async function updateUsuario(
   phone: string,
   campos: Partial<
-    Pick<Usuario, 'nombre' | 'email' | 'estado_conversacion' | 'plan' | 'activo' | 'negocio' | 'tono' | 'memoria'>
+    Pick<Usuario, 'nombre' | 'email' | 'estado_conversacion' | 'plan' | 'activo' | 'negocio' | 'tono' | 'memoria' | 'moneda'>
   >,
 ): Promise<void> {
   const { error } = await supabase.from('usuarios').update(campos).eq('phone', phone);
@@ -159,6 +174,7 @@ export async function insertMovimiento(input: {
   categoria: string | null;
   descripcion: string | null;
   rawMessage: string | null;
+  fecha?: string | null;
 }): Promise<Movimiento> {
   const correlativo = await siguienteCorrelativo(input.userPhone);
 
@@ -171,6 +187,7 @@ export async function insertMovimiento(input: {
     raw_message: input.rawMessage,
   };
   if (correlativo !== null) fila.correlativo = correlativo;
+  if (input.fecha) fila.fecha = input.fecha;
 
   const { data, error } = await supabase
     .from('movimientos')
@@ -182,7 +199,10 @@ export async function insertMovimiento(input: {
   return data as Movimiento;
 }
 
-/** Inserta movimientos en lote (carga masiva desde Excel). Se envían en lotes de 200. */
+/**
+ * Inserta movimientos en lote (carga masiva por Excel o por mensaje con varios
+ * movimientos). Se envían en lotes de 200 y se devuelven las filas insertadas.
+ */
 export async function insertMovimientosMasivo(
   userPhone: string,
   movimientos: {
@@ -192,9 +212,11 @@ export async function insertMovimientosMasivo(
     descripcion: string | null;
     fecha: string;
   }[],
-): Promise<void> {
+  rawMessage = 'Carga masiva (Excel)',
+): Promise<Movimiento[]> {
   const CHUNK = 200;
   const base = await siguienteCorrelativo(userPhone); // null si la columna no existe
+  const insertados: Movimiento[] = [];
 
   for (let i = 0; i < movimientos.length; i += CHUNK) {
     const lote = movimientos.slice(i, i + CHUNK).map((m, idx) => {
@@ -205,15 +227,18 @@ export async function insertMovimientosMasivo(
         categoria: m.categoria,
         descripcion: m.descripcion,
         fecha: m.fecha,
-        raw_message: 'Carga masiva (Excel)',
+        raw_message: rawMessage,
       };
       if (base !== null) fila.correlativo = base + i + idx;
       return fila;
     });
 
-    const { error } = await supabase.from('movimientos').insert(lote);
+    const { data, error } = await supabase.from('movimientos').insert(lote).select();
     if (error) throw error;
+    if (data) insertados.push(...(data as Movimiento[]));
   }
+
+  return insertados;
 }
 
 export async function insertCuentaPorCobrar(input: {
