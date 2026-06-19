@@ -246,6 +246,19 @@ ya salió), y `saldar` (liquida una deuda registrada) de un `egreso` nuevo. Las
 queries de cuentas filtran por `tipo` para no mezclar ambos lados. Los
 recordatorios (cron 9 AM) y el reporte Excel ya cubren ambos tipos.
 
+## Tareas programadas (cron, zona America/Santiago)
+
+Configuradas en `src/index.ts` con `node-cron`:
+
+- **09:00 — Recordatorios** (`tasks/recordatorios.ts`): avisa cuentas por
+  cobrar y por pagar próximas a vencer.
+- **15:00 — "Sabías que..."** (`tasks/tips.ts`): un dato/tip financiero diario
+  a todos los usuarios activos. La lista `TIPS` rota por día del año
+  (determinista: mismo tip para todos cada día, cicla sin repetir).
+
+Ambas son mensajes **proactivos**: fuera de la ventana de 24h de WhatsApp,
+Meta puede exigir plantilla aprobada (ver nota de migración n8n).
+
 ## Onboarding guiado
 
 El primer contacto de un usuario nuevo es un mini-flujo conversacional (100%

@@ -5,6 +5,7 @@ import { verifyWebhook } from './webhook/verify';
 import { handleWebhook } from './webhook/handler';
 import { handleMercadoPagoWebhook } from './webhook/mercadopago';
 import { enviarRecordatorios } from './tasks/recordatorios';
+import { enviarTipDiario } from './tasks/tips';
 
 const app = express();
 app.use(express.json());
@@ -34,6 +35,17 @@ cron.schedule(
   () => {
     void enviarRecordatorios().catch((err) =>
       console.error('[abakus][cron] Error en recordatorios:', err),
+    );
+  },
+  { timezone: 'America/Santiago' },
+);
+
+// "Sabías que..." diario: tip/dato financiero a las 15:00 hora de Santiago.
+cron.schedule(
+  '0 15 * * *',
+  () => {
+    void enviarTipDiario().catch((err) =>
+      console.error('[abakus][cron] Error en tip diario:', err),
     );
   },
   { timezone: 'America/Santiago' },
