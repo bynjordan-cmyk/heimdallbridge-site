@@ -49,6 +49,7 @@ export function detectarComando(texto: string): ComandoEspecial | null {
   // frases como "no lo quiero en excel, muéstrame en el chat" no caigan en Excel.
   if (
     t === 'detalle' || t.startsWith('detalle') ||
+    t.includes('mi detalle') || t.includes('el detalle') || t.includes('dame detalle') ||
     t.includes('en el chat') || t.includes('en chat') || t.includes('por chat') ||
     t.includes('en texto') || t.includes('por texto') ||
     t.includes('aquí mismo') || t.includes('aqui mismo') || t.includes('por aquí') || t.includes('por aqui') ||
