@@ -207,10 +207,11 @@ async function confirmarMovimientoUnico(
   const detalle = [f(item.monto), item.categoria, item.descripcion].filter(Boolean).join(' | ');
   const ref = refTag(nuevo.correlativo);
   const victoria = nuevo.correlativo === 1 ? PRIMERA_VICTORIA : '';
+  const sugClasif = sugerenciaClasificar(item.categoria);
 
   if (item.tipo === 'ingreso') {
     const tip = tipIngreso(item.monto);
-    return `✅ Ingreso registrado${ref}\n💰 ${detalle}${tip}${victoria}`;
+    return `✅ Ingreso registrado${ref}\n💰 ${detalle}${sugClasif}${tip}${victoria}`;
   }
 
   // Egreso: calcular balance del mes y alertar si es negativo.
@@ -224,7 +225,20 @@ async function confirmarMovimientoUnico(
     ? `\n\n⚠️ _Balance del mes: -${f(Math.abs(balance))}. Escribe *resumen* para ver el detalle._`
     : '';
 
-  return `📤 Egreso registrado${ref}\n💸 ${detalle}${alertaBalance}${victoria}`;
+  return `📤 Egreso registrado${ref}\n💸 ${detalle}${sugClasif}${alertaBalance}${victoria}`;
+}
+
+/** Sugerencia gentil para clasificar cuando el movimiento quedó "Sin clasificar". */
+export function sugerenciaClasificar(categoria: string | null): string {
+  return esSinClasificar(categoria)
+    ? '\n\n🏷️ _Quedó *Sin clasificar*. Dime en qué fue y lo ordeno (ej. "era comida")._'
+    : '';
+}
+
+/** ¿La categoría está vacía o marcada como "Sin clasificar"? */
+export function esSinClasificar(categoria: string | null): boolean {
+  const c = (categoria ?? '').trim().toLowerCase();
+  return c === '' || c === 'sin clasificar';
 }
 
 const TIPS_IVA = [

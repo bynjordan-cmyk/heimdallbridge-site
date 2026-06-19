@@ -9,6 +9,7 @@ import {
   updateUsuario,
 } from '../supabase/queries';
 import { formatMonto } from '../utils/format';
+import { sugerenciaClasificar } from './registro';
 
 const ESPERANDO_CUENTA = 'esperando_cuenta';
 
@@ -172,13 +173,16 @@ export async function registrarPendientesEnCuenta(
   const saldos = await getSaldosCuentas(user.phone);
   const saldo = saldos.find((c) => c.id === cuenta.id);
 
-  let msg = items.length === 1
-    ? `✅ Registrado en *${cuenta.nombre}*\n${items[0].tipo === 'ingreso' ? '💰' : '💸'} ${f(items[0].monto)}`
+  const unico = items.length === 1 ? items[0] : null;
+  const cat = unico?.categoria ? ` · ${unico.categoria}` : unico ? ' · Sin clasificar' : '';
+  let msg = unico
+    ? `✅ Registrado en *${cuenta.nombre}*\n${unico.tipo === 'ingreso' ? '💰' : '💸'} ${f(unico.monto)}${cat}`
     : `✅ ${items.length} movimientos en *${cuenta.nombre}*`;
   if (items.length > 1) {
     if (ingresos > 0) msg += `\n💰 Ingresos: ${f(ingresos)}`;
     if (egresos > 0) msg += `\n💸 Egresos: ${f(egresos)}`;
   }
   if (saldo) msg += `\n\nSaldo de ${cuenta.nombre}: *${f(saldo.saldo)}*`;
+  if (unico) msg += sugerenciaClasificar(unico.categoria);
   return msg;
 }
