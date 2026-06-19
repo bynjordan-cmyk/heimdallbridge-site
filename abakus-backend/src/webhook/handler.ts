@@ -4,6 +4,7 @@ import { yaProcesado } from '../utils/idempotency';
 import { getUsuarioByPhone, updateUsuario, agregarAprendizaje, getUltimoMovimiento, CuentasNoDisponibleError } from '../supabase/queries';
 import { interpretar } from '../claude/interpreter';
 import { construirPerfil } from '../aprendizaje/perfil';
+import { recordarRespuesta, ultimaRespuesta } from '../utils/contexto';
 import { esMonedaSoportada, formatMonto } from '../utils/format';
 import { sendText } from '../whatsapp/sender';
 import { enOnboarding, iniciarOnboarding, invitacionPrimerRegistro } from '../flows/onboarding';
@@ -218,9 +219,13 @@ async function procesar(mensaje: MensajeEntrante): Promise<void> {
         ultimo.tipo
       } de ${formatMonto(Number(ultimo.monto), usuario.moneda)}${ultimo.categoria ? ` en "${ultimo.categoria}"` : ''}.`
     : '';
+  const reciente = ultimaRespuesta(usuario.phone);
+  const ctxConversacion = reciente
+    ? `\n\nCONVERSACIÓN RECIENTE — tu último mensaje al usuario fue: "${reciente.slice(0, 300)}". Si este mensaje del usuario responde a eso (por ejemplo, le pediste la categoría/origen de un movimiento y ahora te la da, como "mi salario", "fue un cliente" o "comida"), interprétalo en ese contexto: devuelve tipo="corregir" con referencia = el # del último movimiento y categoria = lo que respondió.`
+    : '';
   const interp = await interpretar(mensaje.texto, {
     nombre: usuario.nombre,
-    perfil: perfil + ctxUltimo,
+    perfil: perfil + ctxUltimo + ctxConversacion,
     moneda: usuario.moneda,
     cuentas,
   });
@@ -303,6 +308,8 @@ async function procesar(mensaje: MensajeEntrante): Promise<void> {
     respuesta = interp.respuesta;
   }
 
+  // Guardamos la respuesta para dar contexto a un posible mensaje de seguimiento.
+  recordarRespuesta(usuario.phone, respuesta);
   await sendText(mensaje.phone, respuesta);
 }
 
