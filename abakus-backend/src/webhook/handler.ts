@@ -12,6 +12,18 @@ import { detectarComando, handleComando } from '../flows/consulta';
 import { handleReporte } from '../flows/reporte';
 import { handleCargaMasiva, handlePlantilla } from '../flows/carga';
 import {
+  esperandoCuenta,
+  handleCrearCuenta,
+  handleListarCuentas,
+  handleTransferencia,
+  limpiarPendiente,
+  nombresCuentas,
+  pedirCuenta,
+  registrarPendientesEnCuenta,
+  resolverCuentaPendiente,
+} from '../flows/cuentas';
+import { buscarCuenta } from '../supabase/queries';
+import {
   accesoVigente,
   descripcionPlanes,
   esperandoEmail,
@@ -118,6 +130,20 @@ async function procesar(mensaje: MensajeEntrante): Promise<void> {
     return;
   }
 
+  // Esperando que el usuario indique a qué cuenta van movimientos pendientes.
+  if (esperandoCuenta(usuario)) {
+    const resuelto = await resolverCuentaPendiente(usuario, mensaje.texto);
+    if ('error' in resuelto) {
+      await sendText(mensaje.phone, resuelto.error);
+      return;
+    }
+    const items = resuelto.items.map((r) => r.item);
+    await limpiarPendiente(usuario);
+    const respuesta = await registrarPendientesEnCuenta(usuario, items, resuelto.cuenta);
+    await sendText(mensaje.phone, respuesta);
+    return;
+  }
+
   // Carga masiva: el usuario envió un documento Excel.
   if (mensaje.documento) {
     await salirDeOnboarding(usuario);
@@ -152,6 +178,10 @@ async function procesar(mensaje: MensajeEntrante): Promise<void> {
     await handlePlantilla(usuario);
     return;
   }
+  if (comando === 'cuentas') {
+    await sendText(mensaje.phone, await handleListarCuentas(usuario));
+    return;
+  }
   if (comando === 'eliminar') {
     // Comando directo de deshacer (último movimiento): no requiere Claude.
     const { eliminarMovimiento } = await import('../supabase/queries');
@@ -173,9 +203,10 @@ async function procesar(mensaje: MensajeEntrante): Promise<void> {
 
   // Interpretación con Claude, alimentada con el perfil aprendido y el último
   // movimiento (para que las correcciones sepan a qué se refieren).
-  const [perfil, ultimo] = await Promise.all([
+  const [perfil, ultimo, cuentas] = await Promise.all([
     construirPerfil(usuario),
     getUltimoMovimiento(usuario.phone).catch(() => null),
+    nombresCuentas(usuario.phone).catch(() => [] as string[]),
   ]);
   const ctxUltimo = ultimo
     ? `\n\nÚLTIMO MOVIMIENTO DEL USUARIO${
@@ -188,7 +219,10 @@ async function procesar(mensaje: MensajeEntrante): Promise<void> {
     nombre: usuario.nombre,
     perfil: perfil + ctxUltimo,
     moneda: usuario.moneda,
+    cuentas,
   });
+
+  const usaCuentas = cuentas.length > 0;
 
   // Persistir lo que Abakus aprendió de este mensaje (nombre, negocio, tono, memoria).
   await persistirAprendizaje(usuario, interp);
@@ -207,14 +241,17 @@ async function procesar(mensaje: MensajeEntrante): Promise<void> {
       categoria: interp.categoria,
       descripcion: interp.descripcion,
       fecha: null,
+      cuenta: interp.cuenta,
     }];
   }
   const tieneMovs = items.length > 0;
 
-  // deuda, cobro, cuenta_pagar, saldar, eliminar y corregir también pasan por handleRegistro.
+  // deuda, cobro, cuenta_pagar, saldar, eliminar, corregir, crear_cuenta y
+  // transferencia también son "acción de datos" (no caen en consulta/onboarding).
   const esAccionDatos = tieneMovs || interp.tipo === 'deuda' || interp.tipo === 'cobro' ||
     interp.tipo === 'cuenta_pagar' || interp.tipo === 'saldar' ||
-    interp.tipo === 'eliminar' || interp.tipo === 'corregir';
+    interp.tipo === 'eliminar' || interp.tipo === 'corregir' ||
+    interp.tipo === 'crear_cuenta' || interp.tipo === 'transferencia';
 
   // Onboarding paso 2: si está en el paso "¿a qué te dedicas?" y NO registró
   // nada, esto es su respuesta de negocio (ya guardada por el aprendizaje) →
@@ -236,7 +273,25 @@ async function procesar(mensaje: MensajeEntrante): Promise<void> {
   }
 
   let respuesta: string;
-  if (tieneMovs) {
+  if (interp.tipo === 'crear_cuenta') {
+    respuesta = await handleCrearCuenta(usuario, interp.cuenta, interp.saldo_inicial);
+  } else if (interp.tipo === 'transferencia') {
+    respuesta = await handleTransferencia(usuario, interp.cuenta_origen, interp.cuenta_destino, interp.monto);
+  } else if (tieneMovs && usaCuentas) {
+    // "Mencionar siempre": una cuenta por mensaje. Si no la indicó, se la pedimos.
+    const mencion = items.find((i) => i.cuenta)?.cuenta ?? interp.cuenta ?? null;
+    if (!mencion) {
+      respuesta = await pedirCuenta(usuario, items);
+    } else {
+      const cuenta = await buscarCuenta(usuario.phone, mencion);
+      if (!cuenta) {
+        const nombres = await nombresCuentas(usuario.phone);
+        respuesta = `No encontré la cuenta "${mencion}" 🤔 Tus cuentas: ${nombres.join(', ')}.`;
+      } else {
+        respuesta = await registrarPendientesEnCuenta(usuario, items, cuenta);
+      }
+    }
+  } else if (tieneMovs) {
     respuesta = await registrarMovimientos(usuario, items, mensaje.texto);
   } else if (esAccionDatos) {
     respuesta = await handleRegistro(usuario, interp);

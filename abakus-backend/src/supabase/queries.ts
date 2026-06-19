@@ -1,5 +1,5 @@
 import { supabase } from './client';
-import { CuentaPorCobrar, Movimiento, TipoMovimiento, Usuario } from '../types';
+import { Cuenta, CuentaConSaldo, CuentaPorCobrar, Movimiento, TipoMovimiento, Usuario } from '../types';
 
 export async function getUsuarioByPhone(phone: string): Promise<Usuario | null> {
   const { data, error } = await supabase
@@ -42,7 +42,7 @@ export async function createUsuario(
 export async function updateUsuario(
   phone: string,
   campos: Partial<
-    Pick<Usuario, 'nombre' | 'email' | 'estado_conversacion' | 'plan' | 'activo' | 'negocio' | 'tono' | 'memoria' | 'moneda'>
+    Pick<Usuario, 'nombre' | 'email' | 'estado_conversacion' | 'plan' | 'activo' | 'negocio' | 'tono' | 'memoria' | 'moneda' | 'pendiente'>
   >,
 ): Promise<void> {
   const { error } = await supabase.from('usuarios').update(campos).eq('phone', phone);
@@ -175,6 +175,7 @@ export async function insertMovimiento(input: {
   descripcion: string | null;
   rawMessage: string | null;
   fecha?: string | null;
+  cuentaId?: string | null;
 }): Promise<Movimiento> {
   const correlativo = await siguienteCorrelativo(input.userPhone);
 
@@ -188,6 +189,7 @@ export async function insertMovimiento(input: {
   };
   if (correlativo !== null) fila.correlativo = correlativo;
   if (input.fecha) fila.fecha = input.fecha;
+  if (input.cuentaId) fila.cuenta_id = input.cuentaId;
 
   const { data, error } = await supabase
     .from('movimientos')
@@ -211,6 +213,7 @@ export async function insertMovimientosMasivo(
     categoria: string | null;
     descripcion: string | null;
     fecha: string;
+    cuentaId?: string | null;
   }[],
   rawMessage = 'Carga masiva (Excel)',
 ): Promise<Movimiento[]> {
@@ -230,6 +233,7 @@ export async function insertMovimientosMasivo(
         raw_message: rawMessage,
       };
       if (base !== null) fila.correlativo = base + i + idx;
+      if (m.cuentaId) fila.cuenta_id = m.cuentaId;
       return fila;
     });
 
@@ -290,6 +294,142 @@ export function insertCuentaPorPagar(input: {
   fechaVencimiento: string | null;
 }): Promise<CuentaPorCobrar> {
   return insertCuenta('por_pagar', input);
+}
+
+// ===== Cuentas (bancos / caja) y transferencias =====
+
+function normalizarNombre(s: string): string {
+  return s.normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase();
+}
+
+export async function getCuentas(userPhone: string): Promise<Cuenta[]> {
+  const { data, error } = await supabase
+    .from('cuentas')
+    .select('*')
+    .eq('user_phone', userPhone)
+    .order('created_at', { ascending: true });
+
+  if (error) throw error;
+  return (data ?? []) as Cuenta[];
+}
+
+/** ¿El usuario tiene al menos una cuenta? Tolerante si la tabla aún no existe. */
+export async function tieneCuentas(userPhone: string): Promise<boolean> {
+  try {
+    const { count, error } = await supabase
+      .from('cuentas')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_phone', userPhone);
+    if (error) throw error;
+    return (count ?? 0) > 0;
+  } catch {
+    return false;
+  }
+}
+
+/** Busca una cuenta del usuario por nombre (tolerante: ignora acentos/mayúsculas
+ *  y acepta coincidencia parcial). Devuelve null si no hay match único claro. */
+export async function buscarCuenta(userPhone: string, nombre: string): Promise<Cuenta | null> {
+  const objetivo = normalizarNombre(nombre);
+  if (!objetivo) return null;
+
+  const cuentas = await getCuentas(userPhone);
+  // 1) match exacto normalizado
+  const exacto = cuentas.find((c) => normalizarNombre(c.nombre) === objetivo);
+  if (exacto) return exacto;
+  // 2) coincidencia parcial (en cualquier dirección)
+  const parciales = cuentas.filter((c) => {
+    const n = normalizarNombre(c.nombre);
+    return n.includes(objetivo) || objetivo.includes(n);
+  });
+  return parciales.length === 1 ? parciales[0] : null;
+}
+
+/** Crea una cuenta; si ya existe una con el mismo nombre, actualiza su saldo inicial. */
+export async function crearCuenta(
+  userPhone: string,
+  nombre: string,
+  tipo: string,
+  saldoInicial: number,
+): Promise<{ cuenta: Cuenta; actualizada: boolean }> {
+  const existente = await buscarCuenta(userPhone, nombre);
+  if (existente) {
+    const { data, error } = await supabase
+      .from('cuentas')
+      .update({ saldo_inicial: saldoInicial })
+      .eq('id', existente.id)
+      .select()
+      .single();
+    if (error) throw error;
+    return { cuenta: data as Cuenta, actualizada: true };
+  }
+
+  const { data, error } = await supabase
+    .from('cuentas')
+    .insert({ user_phone: userPhone, nombre, tipo, saldo_inicial: saldoInicial })
+    .select()
+    .single();
+  if (error) throw error;
+  return { cuenta: data as Cuenta, actualizada: false };
+}
+
+/** Calcula el saldo de cada cuenta: inicial + ingresos − egresos + transf. entrantes − salientes. */
+export async function getSaldosCuentas(userPhone: string): Promise<CuentaConSaldo[]> {
+  const cuentas = await getCuentas(userPhone);
+  if (cuentas.length === 0) return [];
+
+  const [movRes, traRes] = await Promise.all([
+    supabase
+      .from('movimientos')
+      .select('cuenta_id, tipo, monto')
+      .eq('user_phone', userPhone)
+      .not('cuenta_id', 'is', null),
+    supabase
+      .from('transferencias')
+      .select('cuenta_origen, cuenta_destino, monto')
+      .eq('user_phone', userPhone),
+  ]);
+  if (movRes.error) throw movRes.error;
+  if (traRes.error) throw traRes.error;
+
+  const saldos = new Map<string, number>();
+  for (const c of cuentas) saldos.set(c.id, Number(c.saldo_inicial) || 0);
+
+  for (const m of (movRes.data ?? []) as { cuenta_id: string; tipo: string; monto: number }[]) {
+    const actual = saldos.get(m.cuenta_id);
+    if (actual === undefined) continue;
+    saldos.set(m.cuenta_id, actual + (m.tipo === 'ingreso' ? Number(m.monto) : -Number(m.monto)));
+  }
+
+  for (const t of (traRes.data ?? []) as { cuenta_origen: string; cuenta_destino: string; monto: number }[]) {
+    if (t.cuenta_origen && saldos.has(t.cuenta_origen)) {
+      saldos.set(t.cuenta_origen, saldos.get(t.cuenta_origen)! - Number(t.monto));
+    }
+    if (t.cuenta_destino && saldos.has(t.cuenta_destino)) {
+      saldos.set(t.cuenta_destino, saldos.get(t.cuenta_destino)! + Number(t.monto));
+    }
+  }
+
+  return cuentas.map((c) => ({ ...c, saldo: saldos.get(c.id) ?? (Number(c.saldo_inicial) || 0) }));
+}
+
+export async function insertTransferencia(
+  userPhone: string,
+  cuentaOrigen: string,
+  cuentaDestino: string,
+  monto: number,
+  fecha?: string | null,
+): Promise<void> {
+  const fila: Record<string, unknown> = {
+    user_phone: userPhone,
+    cuenta_origen: cuentaOrigen,
+    cuenta_destino: cuentaDestino,
+    monto,
+  };
+  if (fecha) fila.fecha = fecha;
+
+  const { error } = await supabase.from('transferencias').insert(fila);
+  if (error) throw error;
 }
 
 export interface ResumenMes {

@@ -247,6 +247,52 @@ ya salió), y `saldar` (liquida una deuda registrada) de un `egreso` nuevo. Las
 queries de cuentas filtran por `tipo` para no mezclar ambos lados. Los
 recordatorios (cron 9 AM) y el reporte Excel ya cubren ambos tipos.
 
+## Cuentas (bancos / caja), saldos iniciales y transferencias
+
+Modelo de cuentas por usuario para llevar saldos reales.
+
+- **Tablas nuevas** `cuentas` y `transferencias` + columna `cuenta_id` en
+  `movimientos` + columna `pendiente jsonb` en `usuarios`.
+- **Saldo de cuenta** = `saldo_inicial` + ingresos − egresos (de esa cuenta)
+  + transferencias entrantes − salientes (`getSaldosCuentas`).
+- **Crear / saldo inicial** (conversacional, `crear_cuenta`): "tengo Banco
+  Estado con 100000", "agrega caja con 5000". Si la cuenta existe, ajusta el
+  saldo inicial.
+- **Asignación de movimientos:** "mencionar siempre". Si el usuario YA tiene
+  cuentas, cada ingreso/egreso debe indicar la cuenta ("pagué 5000 de luz con
+  Banco Estado"). Si no la indica, Abakus guarda el movimiento en
+  `usuarios.pendiente` (estado `esperando_cuenta`) y pregunta a cuál va; la
+  respuesta lo registra. Una cuenta por mensaje.
+- **Transferencias** (`transferencia`): "transferí 50000 de Banco Estado a
+  Caja" → no es ingreso ni egreso; ajusta ambos saldos.
+- **Comando `cuentas`** (`flows/cuentas.ts`): lista saldos por cuenta + total.
+- **Compatibilidad:** la obligación de mencionar cuenta solo se activa cuando el
+  usuario tiene ≥1 cuenta. Los usuarios sin cuentas siguen igual que antes
+  (`cuenta_id` queda null). El código degrada si las tablas aún no existen.
+
+> **Migración requerida para cuentas:**
+> ```sql
+> CREATE TABLE IF NOT EXISTS cuentas (
+>   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+>   user_phone text NOT NULL,
+>   nombre text NOT NULL,
+>   tipo text DEFAULT 'banco',          -- banco | caja | otro
+>   saldo_inicial numeric DEFAULT 0,
+>   created_at timestamptz DEFAULT now()
+> );
+> CREATE TABLE IF NOT EXISTS transferencias (
+>   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+>   user_phone text NOT NULL,
+>   cuenta_origen uuid,
+>   cuenta_destino uuid,
+>   monto numeric NOT NULL,
+>   fecha date DEFAULT CURRENT_DATE,
+>   created_at timestamptz DEFAULT now()
+> );
+> ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS cuenta_id uuid;
+> ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS pendiente jsonb;
+> ```
+
 ## Tareas programadas (cron, zona America/Santiago)
 
 Configuradas en `src/index.ts` con `node-cron`:

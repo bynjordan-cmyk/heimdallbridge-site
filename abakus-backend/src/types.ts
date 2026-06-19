@@ -16,6 +16,10 @@ export interface Usuario {
   email: string | null;
   estado_conversacion: string | null;
   meta_mensual: number | null;
+  // Movimientos en espera de que el usuario indique a qué cuenta van
+  // (estado_conversacion === 'esperando_cuenta'). Requiere columna
+  // `pendiente jsonb` en usuarios.
+  pendiente: MovimientoInterpretado[] | null;
   // Memoria explícita: datos durables que el usuario ha mencionado y que
   // Abakus recuerda para personalizar futuras conversaciones.
   // Requiere columna `memoria jsonb DEFAULT '[]'` en la tabla usuarios.
@@ -36,7 +40,28 @@ export interface Movimiento {
   categoria: string | null;
   descripcion: string | null;
   fecha: string;
+  // Cuenta (banco/caja) a la que pertenece el movimiento. Requiere columna
+  // `cuenta_id uuid` en movimientos. null = movimiento sin cuenta (legacy o
+  // usuarios que aún no usan cuentas).
+  cuenta_id: string | null;
   created_at: string;
+}
+
+export type TipoCuenta = 'banco' | 'caja' | 'otro';
+
+/** Cuenta del usuario: banco o caja/efectivo, con saldo inicial. */
+export interface Cuenta {
+  id: string;
+  user_phone: string;
+  nombre: string;
+  tipo: TipoCuenta | string;
+  saldo_inicial: number;
+  created_at: string;
+}
+
+/** Una cuenta con su saldo calculado (inicial + movimientos + transferencias). */
+export interface CuentaConSaldo extends Cuenta {
+  saldo: number;
 }
 
 export interface CuentaPorCobrar {
@@ -54,7 +79,7 @@ export interface CuentaPorCobrar {
 
 // ===== Interpretación de Claude =====
 
-export type TipoInterpretacion = 'ingreso' | 'egreso' | 'consulta' | 'deuda' | 'cobro' | 'cuenta_pagar' | 'saldar' | 'eliminar' | 'corregir' | 'desconocido';
+export type TipoInterpretacion = 'ingreso' | 'egreso' | 'consulta' | 'deuda' | 'cobro' | 'cuenta_pagar' | 'saldar' | 'eliminar' | 'corregir' | 'crear_cuenta' | 'transferencia' | 'desconocido';
 
 /**
  * Un ingreso o egreso individual detectado dentro de un mensaje. Un solo mensaje
@@ -67,6 +92,7 @@ export interface MovimientoInterpretado {
   categoria: string | null;
   descripcion: string | null;
   fecha: string | null; // YYYY-MM-DD si el usuario la menciona; null = hoy
+  cuenta: string | null; // nombre de la cuenta/banco mencionada, o null
 }
 
 export interface Interpretacion {
@@ -86,6 +112,13 @@ export interface Interpretacion {
   // Nuevo tipo al corregir un movimiento ("era un ingreso no egreso"). null si
   // la corrección no cambia el tipo. Solo aplica a tipo === 'corregir'.
   nuevo_tipo: TipoMovimiento | null;
+  // ===== Cuentas (bancos / caja) =====
+  // crear_cuenta: nombre y saldo inicial de la cuenta a crear.
+  cuenta: string | null;
+  saldo_inicial: number | null;
+  // transferencia: cuentas origen y destino.
+  cuenta_origen: string | null;
+  cuenta_destino: string | null;
   // ===== Aprendizaje: datos que Claude extrae para recordar =====
   negocio: string | null;      // a qué se dedica el usuario, si lo revela
   tono: string | null;         // preferencia de estilo, si la pide explícitamente

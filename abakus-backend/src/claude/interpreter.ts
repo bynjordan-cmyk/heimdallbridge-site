@@ -21,6 +21,8 @@ TIPOS posibles:
 - "saldar": el usuario pagó una cuenta por pagar que tenía pendiente (ya le pagué a, salde la deuda, pagué lo que debía, cancelé la cuota de...). Distíntelo de "egreso": "saldar" liquida una deuda registrada antes; si nunca registró esa deuda, probablemente es un "egreso".
 - "eliminar": el usuario quiere borrar el último movimiento registrado (me equivoqué, borra el último, deshacer, undo, error...)
 - "corregir": el usuario quiere MODIFICAR un movimiento que registró, no borrarlo (ej. "no, eran 3 mil", "modifica el monto a 5000", "lo pusiste mal, eran 2000", "cambia la categoría a transporte", "fueron solo 3mil", "corrige el #5 a 2000", "era un ingreso no egreso"). Devuelve en monto/categoria/descripcion SOLO los valores corregidos; deja en null lo que no cambia. Si la corrección cambia el TIPO del movimiento (de ingreso a egreso o viceversa), indícalo en "nuevo_tipo" (ingreso|egreso); si no cambia el tipo, nuevo_tipo = null.
+- "crear_cuenta": el usuario quiere crear/registrar una cuenta (banco o caja/efectivo) o fijar su saldo inicial (ej. "tengo Banco Estado con 100000", "agrega caja con 5000", "mi cuenta de MercadoPago parte en 20000", "crea la cuenta efectivo"). Devuelve "cuenta" (el nombre) y "saldo_inicial" (number; 0 si no lo dice).
+- "transferencia": el usuario movió plata ENTRE sus propias cuentas (ej. "transferí 50000 de Banco Estado a Caja", "pasé 20 lucas de la caja al banco", "saqué 30000 del banco a efectivo"). Devuelve "cuenta_origen", "cuenta_destino" y "monto". NO es un egreso ni un ingreso.
 - "consulta": pregunta sobre sus datos, saludos, presentaciones de nombre, agradecimientos, o cualquier mensaje fuera de registro
 - "desconocido": el mensaje es ambiguo y necesita clarificación. INCLUYE el caso en que hay un monto pero NO está clara la DIRECCIÓN (si entró o salió dinero).
 
@@ -29,7 +31,8 @@ DIRECCIÓN AMBIGUA (muy importante): un sustantivo de dinero sin verbo que indiq
 MOVIMIENTOS (lo más importante para registrar ingresos y egresos):
 - Cuando el mensaje describe uno O VARIOS ingresos/egresos, devuelve CADA uno como un elemento del arreglo "movimientos". Un mismo mensaje puede traer muchos (ej: "vendí 50 mil el lunes, pagué 20 mil de arriendo y gasté 8 mil en bencina" → 3 movimientos). Esto permite que el usuario cargue de una vez su historial sin Excel.
 - Incluso un único ingreso/egreso va en "movimientos" (como un arreglo de 1 elemento).
-- Cada movimiento lleva: "tipo" (ingreso|egreso), "monto" (number), "categoria" (string|null), "descripcion" (string|null) y "fecha" ("YYYY-MM-DD" o null).
+- Cada movimiento lleva: "tipo" (ingreso|egreso), "monto" (number), "categoria" (string|null), "descripcion" (string|null), "fecha" ("YYYY-MM-DD" o null) y "cuenta" (nombre del banco/caja si el usuario lo menciona, ej. "pagué 5000 de luz con Banco Estado" → cuenta:"Banco Estado"; si no lo menciona, cuenta=null).
+- Si en el contexto recibes CUENTAS DEL USUARIO, usa esos nombres EXACTOS al rellenar "cuenta", "cuenta_origen" y "cuenta_destino" (haz el match aunque el usuario los escriba distinto: "la caja" → "Caja", "estado" → "Banco Estado").
 - "fecha": HOY es ${'${HOY}'}. Resuelve fechas relativas a hoy ("ayer", "antier", "el lunes", "el 3 de mayo", "la semana pasada") a "YYYY-MM-DD". Si el usuario NO menciona cuándo, fecha = null (se asume hoy).
 - Para tipos que NO son registro de ingreso/egreso (consulta, deuda, cobro, cuenta_pagar, saldar, eliminar, corregir, desconocido), "movimientos" = [] (arreglo vacío).
 - Cuando "movimientos" tiene elementos, "tipo" del nivel superior debe ser "ingreso" o "egreso" (el del primer/principal movimiento). Si el mensaje mezcla ingresos/egresos con una deuda, prioriza los ingresos/egresos en "movimientos" y menciona en "respuesta" que la deuda la registre por separado.
@@ -73,7 +76,7 @@ const SCHEMA = {
   properties: {
     tipo: {
       type: 'string',
-      enum: ['ingreso', 'egreso', 'consulta', 'deuda', 'cobro', 'cuenta_pagar', 'saldar', 'eliminar', 'corregir', 'desconocido'],
+      enum: ['ingreso', 'egreso', 'consulta', 'deuda', 'cobro', 'cuenta_pagar', 'saldar', 'eliminar', 'corregir', 'crear_cuenta', 'transferencia', 'desconocido'],
     },
     nombre: { anyOf: [{ type: 'string' }, { type: 'null' }] },
     monto: { anyOf: [{ type: 'number' }, { type: 'null' }] },
@@ -92,13 +95,18 @@ const SCHEMA = {
           categoria: { anyOf: [{ type: 'string' }, { type: 'null' }] },
           descripcion: { anyOf: [{ type: 'string' }, { type: 'null' }] },
           fecha: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+          cuenta: { anyOf: [{ type: 'string' }, { type: 'null' }] },
         },
-        required: ['tipo', 'monto', 'categoria', 'descripcion', 'fecha'],
+        required: ['tipo', 'monto', 'categoria', 'descripcion', 'fecha', 'cuenta'],
         additionalProperties: false,
       },
     },
     referencia: { anyOf: [{ type: 'number' }, { type: 'null' }] },
     nuevo_tipo: { anyOf: [{ type: 'string', enum: ['ingreso', 'egreso'] }, { type: 'null' }] },
+    cuenta: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+    saldo_inicial: { anyOf: [{ type: 'number' }, { type: 'null' }] },
+    cuenta_origen: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+    cuenta_destino: { anyOf: [{ type: 'string' }, { type: 'null' }] },
     negocio: { anyOf: [{ type: 'string' }, { type: 'null' }] },
     tono: { anyOf: [{ type: 'string' }, { type: 'null' }] },
     aprendizaje: { anyOf: [{ type: 'string' }, { type: 'null' }] },
@@ -116,6 +124,10 @@ const SCHEMA = {
     'movimientos',
     'referencia',
     'nuevo_tipo',
+    'cuenta',
+    'saldo_inicial',
+    'cuenta_origen',
+    'cuenta_destino',
     'negocio',
     'tono',
     'aprendizaje',
@@ -134,6 +146,8 @@ const TIPOS_VALIDOS: TipoInterpretacion[] = [
   'saldar',
   'eliminar',
   'corregir',
+  'crear_cuenta',
+  'transferencia',
   'desconocido',
 ];
 
@@ -141,7 +155,7 @@ const RESPUESTA_FALLBACK = 'No estoy seguro de haber entendido 🤔 ¿Me lo cuen
 
 export async function interpretar(
   texto: string,
-  contexto?: { nombre?: string | null; perfil?: string; moneda?: string | null },
+  contexto?: { nombre?: string | null; perfil?: string; moneda?: string | null; cuentas?: string[] },
 ): Promise<Interpretacion> {
   const dato = contexto?.nombre
     ? `\n\nDATO DEL USUARIO: Su nombre es "${contexto.nombre}". Úsalo con naturalidad en tus respuestas y, si pregunta cómo se llama, díselo directamente.`
@@ -149,12 +163,16 @@ export async function interpretar(
 
   const moneda = `\n\nMONEDA DEL USUARIO: ${contexto?.moneda ?? 'CLP'}. Interpreta y responde los montos en esta moneda, salvo que el usuario indique explícitamente otra.`;
 
+  const cuentas = contexto?.cuentas && contexto.cuentas.length > 0
+    ? `\n\nCUENTAS DEL USUARIO: ${contexto.cuentas.join(', ')}. Usa estos nombres EXACTOS al rellenar cuenta/cuenta_origen/cuenta_destino.`
+    : '';
+
   const perfil = contexto?.perfil ?? '';
 
   const response = await client.messages.create({
     model: config.anthropic.model,
     max_tokens: 1024,
-    system: SYSTEM_PROMPT.replace('${HOY}', hoyISO()) + dato + moneda + perfil,
+    system: SYSTEM_PROMPT.replace('${HOY}', hoyISO()) + dato + moneda + cuentas + perfil,
     messages: [{ role: 'user', content: texto }],
     output_config: { format: { type: 'json_schema', schema: SCHEMA } },
   });
@@ -199,6 +217,12 @@ function normalizar(raw: string): Interpretacion {
     nuevo_tipo: parsed.nuevo_tipo === 'ingreso' || parsed.nuevo_tipo === 'egreso'
       ? parsed.nuevo_tipo
       : null,
+    cuenta: textoLimpio(parsed.cuenta),
+    saldo_inicial: typeof parsed.saldo_inicial === 'number' && Number.isFinite(parsed.saldo_inicial)
+      ? parsed.saldo_inicial
+      : null,
+    cuenta_origen: textoLimpio(parsed.cuenta_origen),
+    cuenta_destino: textoLimpio(parsed.cuenta_destino),
     negocio: textoLimpio(parsed.negocio),
     tono: textoLimpio(parsed.tono),
     aprendizaje: textoLimpio(parsed.aprendizaje),
@@ -241,6 +265,7 @@ function normalizarMovimientos(valor: unknown): MovimientoInterpretado[] {
       categoria: textoLimpio(m.categoria),
       descripcion: textoLimpio(m.descripcion),
       fecha: typeof m.fecha === 'string' && FECHA_RE.test(m.fecha) ? m.fecha : null,
+      cuenta: textoLimpio(m.cuenta),
     });
   }
   return out;

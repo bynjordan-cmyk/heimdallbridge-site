@@ -10,7 +10,7 @@ import {
   periodoMesesAtras,
 } from '../reports/periodo';
 
-export type ComandoEspecial = 'resumen' | 'detalle' | 'cobros' | 'porpagar' | 'ayuda' | 'pago' | 'planes' | 'reporte' | 'eliminar' | 'comparar' | 'meta' | 'proyeccion' | 'plantilla';
+export type ComandoEspecial = 'resumen' | 'detalle' | 'cobros' | 'porpagar' | 'cuentas' | 'ayuda' | 'pago' | 'planes' | 'reporte' | 'eliminar' | 'comparar' | 'meta' | 'proyeccion' | 'plantilla';
 
 const MESES_ES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 const tieneMes = (s: string) => MESES_ES.some((m) => s.includes(m));
@@ -26,6 +26,10 @@ export function detectarComando(texto: string): ComandoEspecial | null {
     t === 'a quién le debo' || t === 'a quien le debo'
   ) return 'porpagar';
   if (t === 'cobros' || t === 'pendientes' || t === 'por cobrar' || t === 'me deben') return 'cobros';
+  if (
+    t === 'cuentas' || t === 'mis cuentas' || t === 'saldos' || t === 'mis saldos' ||
+    t === 'bancos' || t === 'mis bancos' || t === 'cuánto tengo' || t === 'cuanto tengo'
+  ) return 'cuentas';
   if (t === 'ayuda' || t === 'help' || t === 'menu' || t === 'menú') return 'ayuda';
   if (
     t === 'pagar' || t === 'suscribirme' || t === 'suscribir' ||
@@ -79,6 +83,7 @@ const AYUDA = `🧮 *Abakus* — esto es lo que puedo hacer:
 • *resumen mayo* → balance de cualquier mes anterior.
 • *proyección julio* → estimado de un mes futuro según tu historial.
 • *comparar* → este mes vs el mes pasado.
+• *cuentas* → saldos de tus bancos y caja. Crea una: "tengo Banco Estado con 100000". Transfiere: "pasé 20000 de Banco Estado a Caja".
 • *cobros* → lo que te deben (cuentas por cobrar). "Juan me debe 30000".
 • *por pagar* → lo que tú debes (cuentas por pagar). "le debo 20000 a Ana" · "ya le pagué a Ana".
 • *detalle* → lista tus movimientos aquí en el chat (o "detalle mayo").
