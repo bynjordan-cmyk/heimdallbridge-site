@@ -83,10 +83,12 @@ function extraerMensaje(body: WhatsAppWebhookBody): MensajeEntrante | null {
   };
 }
 
-/** Normaliza a solo dígitos, sin '+' (ej: "+56935594094" -> "56935594094").
- *  Coincide con el formato que usa el flujo de n8n en las tablas Supabase. */
+/** Normaliza a E.164 con '+' (ej: "56935594094" -> "+56935594094").
+ *  Coincide con el formato que usa el flujo de n8n en las tablas Supabase, para
+ *  reconocer a los usuarios existentes y no fragmentar su historial. El envío por
+ *  Cloud API quita el '+' por su cuenta (whatsapp/sender.ts). */
 function normalizarTelefono(raw: string): string {
-  return raw.replace(/\D/g, '');
+  return '+' + raw.replace(/\D/g, '');
 }
 
 async function procesar(mensaje: MensajeEntrante): Promise<void> {
