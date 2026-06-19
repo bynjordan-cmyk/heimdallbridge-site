@@ -8,6 +8,9 @@ export interface Usuario {
   activo: boolean | null;
   negocio: string | null;
   tono: string | null;
+  // Moneda del usuario (ISO 4217: 'CLP', 'MXN', 'PEN', 'USD'...). Una por usuario.
+  // Se infiere del prefijo telefónico y se ajusta si la persona menciona otra.
+  moneda: string | null;
   onboarding_step: number | null;
   trial_ends_at: string | null;
   email: string | null;
@@ -84,6 +87,9 @@ export interface Interpretacion {
   negocio: string | null;      // a qué se dedica el usuario, si lo revela
   tono: string | null;         // preferencia de estilo, si la pide explícitamente
   aprendizaje: string | null;  // dato durable nuevo a recordar (o null)
+  // Moneda (ISO 4217) que el usuario menciona o revela explícitamente en este
+  // mensaje (ej. "uso dólares", "cobré 100 soles"). null si no la menciona.
+  moneda: string | null;
 }
 
 // ===== Mensaje entrante ya normalizado =====

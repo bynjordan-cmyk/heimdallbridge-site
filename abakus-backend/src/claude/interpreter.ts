@@ -32,8 +32,10 @@ MOVIMIENTOS (lo más importante para registrar ingresos y egresos):
 - Los campos de dinero del nivel superior (monto/categoria/descripcion) son SOLO para "corregir". Para ingreso/egreso usa "movimientos"; déjalos en null arriba.
 
 REGLAS:
-- Moneda CLP por defecto (Chile). Si dice "$50.000" o "50 mil" → monto = 50000.
-- "mil" en lenguaje coloquial chileno multiplica por 1000 SOLO cuando el número es chico: "3 mil"/"3mil" = 3000, "50 mil" = 50000. Pero si el número antes de "mil" ya es grande (≥1000), "mil" suele ser una muletilla y el monto es ese número tal cual: "3000 mil pesos" = 3000 (NO 3.000.000), "5000 mil" = 5000. Ante la duda, elige el monto más bajo y razonable.
+- Abakus es MULTIMONEDA (Chile y toda LATAM, más USD/EUR). La moneda del usuario se te indica en el contexto (MONEDA DEL USUARIO). Interpreta los montos en ESA moneda salvo que el usuario mencione otra distinta.
+- Separadores de miles/decimales según el país: en casi toda LATAM "." separa miles y "," separa decimales (ej. "$1.500" = 1500; "1.299,90" = 1299.9). En USD/inglés es al revés ("$1,500.00" = 1500). Usa la convención del país del usuario; ante la duda, elige el monto entero más razonable.
+- "mil"/"luca" en lenguaje coloquial multiplica por 1000 SOLO cuando el número es chico: "3 mil"/"3mil"/"3 lucas" = 3000, "50 mil" = 50000. Pero si el número antes de "mil" ya es grande (≥1000), "mil" suele ser muletilla y el monto es ese número tal cual: "3000 mil" = 3000 (NO 3.000.000), "5000 mil" = 5000. Ante la duda, elige el monto más bajo y razonable.
+- "moneda": si el usuario menciona o revela una moneda explícitamente (ej. "uso dólares", "trabajo en soles", "cobré 100 USD", "soy de México"), devuélvela como código ISO 4217 (CLP, ARS, MXN, COP, PEN, BOB, UYU, PYG, VES, GTQ, CRC, HNL, NIO, DOP, BRL, USD, EUR...). Si no menciona ninguna, moneda = null. Si la moneda que menciona es distinta a la del usuario y deja claro que esa es la suya, confírmalo cálidamente en "respuesta".
 - "referencia": si el usuario menciona el NÚMERO de un movimiento para corregir o borrar (ej. "el #5", "el movimiento 5", "corrige el 3", "borra el número 7"), pon ese entero en "referencia". OJO: esto es el identificador del movimiento, NO confundir con el monto. Si no menciona un número de movimiento (se refiere al último o a ninguno), referencia = null.
 - No inventes datos: si no hay monto claro para un movimiento, no lo agregues a "movimientos".
 - Para "cobro": contraparte = quien pagó, monto = cuánto pagó (o null si no lo dice).
@@ -91,6 +93,7 @@ const SCHEMA = {
     negocio: { anyOf: [{ type: 'string' }, { type: 'null' }] },
     tono: { anyOf: [{ type: 'string' }, { type: 'null' }] },
     aprendizaje: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+    moneda: { anyOf: [{ type: 'string' }, { type: 'null' }] },
   },
   required: [
     'tipo',
@@ -106,6 +109,7 @@ const SCHEMA = {
     'negocio',
     'tono',
     'aprendizaje',
+    'moneda',
   ],
   additionalProperties: false,
 } as const;
@@ -125,18 +129,20 @@ const RESPUESTA_FALLBACK = 'No estoy seguro de haber entendido 🤔 ¿Me lo cuen
 
 export async function interpretar(
   texto: string,
-  contexto?: { nombre?: string | null; perfil?: string },
+  contexto?: { nombre?: string | null; perfil?: string; moneda?: string | null },
 ): Promise<Interpretacion> {
   const dato = contexto?.nombre
     ? `\n\nDATO DEL USUARIO: Su nombre es "${contexto.nombre}". Úsalo con naturalidad en tus respuestas y, si pregunta cómo se llama, díselo directamente.`
     : '';
+
+  const moneda = `\n\nMONEDA DEL USUARIO: ${contexto?.moneda ?? 'CLP'}. Interpreta y responde los montos en esta moneda, salvo que el usuario indique explícitamente otra.`;
 
   const perfil = contexto?.perfil ?? '';
 
   const response = await client.messages.create({
     model: config.anthropic.model,
     max_tokens: 1024,
-    system: SYSTEM_PROMPT.replace('${HOY}', hoyISO()) + dato + perfil,
+    system: SYSTEM_PROMPT.replace('${HOY}', hoyISO()) + dato + moneda + perfil,
     messages: [{ role: 'user', content: texto }],
     output_config: { format: { type: 'json_schema', schema: SCHEMA } },
   });
@@ -181,7 +187,15 @@ function normalizar(raw: string): Interpretacion {
     negocio: textoLimpio(parsed.negocio),
     tono: textoLimpio(parsed.tono),
     aprendizaje: textoLimpio(parsed.aprendizaje),
+    moneda: normalizarMonedaOpcional(parsed.moneda),
   };
+}
+
+/** Código ISO de moneda válido (mayúsculas) o null si no es reconocible. */
+function normalizarMonedaOpcional(valor: unknown): string | null {
+  if (typeof valor !== 'string') return null;
+  const c = valor.trim().toUpperCase();
+  return /^[A-Z]{3}$/.test(c) ? c : null;
 }
 
 /** Devuelve el string recortado si tiene contenido, o null. */

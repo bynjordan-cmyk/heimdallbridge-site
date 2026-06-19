@@ -14,7 +14,7 @@ import {
 function refTag(correlativo: number | null): string {
   return correlativo != null ? ` #${correlativo}` : '';
 }
-import { clp } from '../utils/format';
+import { formatMonto } from '../utils/format';
 import { mesActual } from '../reports/periodo';
 
 const LIMITE_CUENTAS_BASICO = 3;
@@ -23,6 +23,7 @@ export async function handleRegistro(
   user: Usuario,
   interp: Interpretacion,
 ): Promise<string> {
+  const f = (n: number) => formatMonto(n, user.moneda);
 
   // === Marcar deuda como cobrada ===
   if (interp.tipo === 'cobro') {
@@ -31,7 +32,7 @@ export async function handleRegistro(
       const quien = interp.contraparte ? `de *${interp.contraparte}*` : 'pendiente';
       return `Mmm, no encontré ninguna cuenta ${quien} activa 🤔 ¿Ya la habías marcado antes?`;
     }
-    return `✅ ¡Cobro registrado!\n👤 ${cuenta.contraparte ?? 'Sin contraparte'} | ${clp(Number(cuenta.monto))} marcado como *pagado*. 🎉`;
+    return `✅ ¡Cobro registrado!\n👤 ${cuenta.contraparte ?? 'Sin contraparte'} | ${f(Number(cuenta.monto))} marcado como *pagado*. 🎉`;
   }
 
   // === Corregir un movimiento (por #referencia o el último) ===
@@ -51,7 +52,7 @@ export async function handleRegistro(
     const { anterior, actualizado } = res;
     const cambios: string[] = [];
     if (Number(anterior.monto) !== Number(actualizado.monto)) {
-      cambios.push(`💲 Monto: ${clp(Number(anterior.monto))} → *${clp(Number(actualizado.monto))}*`);
+      cambios.push(`💲 Monto: ${f(Number(anterior.monto))} → *${f(Number(actualizado.monto))}*`);
     }
     if ((anterior.categoria ?? '') !== (actualizado.categoria ?? '')) {
       cambios.push(`🏷️ Categoría: ${anterior.categoria ?? '—'} → *${actualizado.categoria ?? '—'}*`);
@@ -78,7 +79,7 @@ export async function handleRegistro(
         ? `No encontré el movimiento #${interp.referencia} 🤔`
         : 'No encontré movimientos recientes para borrar 🤔';
     }
-    const detalle = [clp(Number(mov.monto)), mov.categoria, mov.descripcion]
+    const detalle = [f(Number(mov.monto)), mov.categoria, mov.descripcion]
       .filter(Boolean)
       .join(' | ');
     const emoji = mov.tipo === 'ingreso' ? '💰' : '💸';
@@ -110,7 +111,7 @@ export async function handleRegistro(
   const vence = interp.fecha_vencimiento ? ` | vence ${interp.fecha_vencimiento}` : '';
   return `📋 Cuenta por cobrar registrada\n👤 ${
     interp.contraparte ?? 'Sin contraparte'
-  } | ${clp(interp.monto)}${vence}`;
+  } | ${f(interp.monto)}${vence}`;
 }
 
 /** Fecha de hoy en YYYY-MM-DD (default cuando el movimiento no trae fecha). */
@@ -133,6 +134,7 @@ export async function registrarMovimientos(
   items: MovimientoInterpretado[],
   textoOriginal: string,
 ): Promise<string> {
+  const f = (n: number) => formatMonto(n, user.moneda);
   if (items.length === 1) {
     return confirmarMovimientoUnico(user, items[0], textoOriginal);
   }
@@ -155,8 +157,8 @@ export async function registrarMovimientos(
   const totalEgresos = egresos.reduce((s, m) => s + m.monto, 0);
 
   let msg = `✅ *Registré ${items.length} movimientos*`;
-  if (ingresos.length > 0) msg += `\n💰 Ingresos: ${clp(totalIngresos)} (${ingresos.length})`;
-  if (egresos.length > 0) msg += `\n💸 Egresos: ${clp(totalEgresos)} (${egresos.length})`;
+  if (ingresos.length > 0) msg += `\n💰 Ingresos: ${f(totalIngresos)} (${ingresos.length})`;
+  if (egresos.length > 0) msg += `\n💸 Egresos: ${f(totalEgresos)} (${egresos.length})`;
   msg += `\n\nEscribe *resumen* para ver tu balance actualizado.`;
 
   if (insertados.some((m) => m.correlativo === 1)) {
@@ -171,6 +173,7 @@ async function confirmarMovimientoUnico(
   item: MovimientoInterpretado,
   textoOriginal: string,
 ): Promise<string> {
+  const f = (n: number) => formatMonto(n, user.moneda);
   const nuevo = await insertMovimiento({
     userPhone: user.phone,
     tipo: item.tipo,
@@ -181,7 +184,7 @@ async function confirmarMovimientoUnico(
     fecha: item.fecha,
   });
 
-  const detalle = [clp(item.monto), item.categoria, item.descripcion].filter(Boolean).join(' | ');
+  const detalle = [f(item.monto), item.categoria, item.descripcion].filter(Boolean).join(' | ');
   const ref = refTag(nuevo.correlativo);
   const victoria = nuevo.correlativo === 1 ? PRIMERA_VICTORIA : '';
 
@@ -198,7 +201,7 @@ async function confirmarMovimientoUnico(
   const balance = totalIngresos - totalEgresos;
 
   const alertaBalance = balance < 0
-    ? `\n\n⚠️ _Balance del mes: -${clp(Math.abs(balance))}. Escribe *resumen* para ver el detalle._`
+    ? `\n\n⚠️ _Balance del mes: -${f(Math.abs(balance))}. Escribe *resumen* para ver el detalle._`
     : '';
 
   return `📤 Egreso registrado${ref}\n💸 ${detalle}${alertaBalance}${victoria}`;

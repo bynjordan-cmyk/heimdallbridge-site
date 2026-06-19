@@ -114,6 +114,16 @@ created_at        timestamptz DEFAULT now()
 > (`siguienteCorrelativo`). Volumen bajo (un usuario escribe de a un mensaje),
 > así que el riesgo de colisión es despreciable.
 
+> **Migración requerida para multimoneda:** la tabla `usuarios` necesita una
+> columna `moneda text` (ISO 4217). El código degrada con gracia si aún no existe
+> (`createUsuario` reintenta sin ella; la persistencia va en su propio try/catch),
+> pero la moneda no se guardará hasta crearla. Backfill: los usuarios existentes
+> (Chile) quedan en CLP.
+> ```sql
+> ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS moneda text DEFAULT 'CLP';
+> UPDATE usuarios SET moneda = 'CLP' WHERE moneda IS NULL;
+> ```
+
 ## Aprendizaje del usuario (`src/aprendizaje/perfil.ts`)
 
 Abakus personaliza la interpretación de Claude con un "perfil" del usuario que
@@ -190,12 +200,14 @@ abakus-backend/
      "respuesta": string,
      "movimientos": [{ "tipo": "ingreso|egreso", "monto": number, "categoria": string|null, "descripcion": string|null, "fecha": "YYYY-MM-DD"|null }],
      "referencia": number|null,
-     "negocio": string|null, "tono": string|null, "aprendizaje": string|null
+     "negocio": string|null, "tono": string|null, "aprendizaje": string|null,
+     "moneda": "CLP|MXN|PEN|USD|..."|null
    }
    ```
    Antes de llamar a Claude se le inyecta el perfil del usuario, el **último
-   movimiento** registrado (para que las correcciones sepan a qué se refieren) y
-   la **fecha de hoy** (para resolver "ayer", "el lunes", etc. en `movimientos[].fecha`).
+   movimiento** registrado (para que las correcciones sepan a qué se refieren),
+   la **fecha de hoy** (para resolver "ayer", "el lunes", etc. en `movimientos[].fecha`)
+   y la **moneda del usuario** (ver *Multimoneda*).
    El array `movimientos` lleva **uno o varios** ingresos/egresos detectados en el
    mismo mensaje (ver *Registro multi-movimiento*); va vacío para los demás tipos.
 7. **Guardar en Supabase** — ingreso/egreso → `movimientos`; deuda → `cuentas_pendientes`;
@@ -238,6 +250,37 @@ WhatsApp, sin Excel) que busca una **primera victoria** rápida:
 La **primera victoria** se detecta de forma stateless: cuando un movimiento se
 inserta con `correlativo === 1` (su primer movimiento), la confirmación incluye un
 mensaje celebratorio de cierre de onboarding (`PRIMERA_VICTORIA` en `registro.ts`).
+
+## Multimoneda
+
+Abakus opera en varios países (Chile y LATAM, más USD/EUR), con **una moneda por
+usuario** (ISO 4217 en `usuarios.moneda`). Toda la lógica de formato vive en
+`utils/format.ts`:
+
+- `monedaPorTelefono(phone)` infiere la moneda del prefijo telefónico (56→CLP,
+  52→MXN, 51→PEN, 57→COP, 54→ARS, 593→USD, etc.). Se usa al crear el usuario.
+- `formatMonto(monto, moneda)` formatea con símbolo y decimales correctos vía
+  `Intl.NumberFormat` (CLP/COP/PYG sin decimales; USD/PEN/MXN con dos). `clp()`
+  quedó como atajo retrocompatible (= `formatMonto(monto, 'CLP')`).
+- `normalizarMoneda` / `esMonedaSoportada` validan códigos.
+
+Cómo se determina (estrategia *auto + confirmar*):
+1. **Al crear el usuario** se infiere por teléfono (`iniciarOnboarding`).
+2. **Se confirma** en la invitación al primer registro
+   (`invitacionPrimerRegistro`): "Registraré tus montos en *X*; si usas otra,
+   dímelo".
+3. **Claude la ajusta**: el interpreter recibe la moneda del usuario en el prompt
+   y devuelve el campo `moneda` cuando la persona menciona una distinta
+   ("uso dólares", "cobré 100 soles"); `persistirAprendizaje` la guarda (solo si
+   es soportada y distinta a la actual).
+
+`moneda` es una **columna nueva** (ver migración abajo). El código degrada con
+gracia si aún no existe: `createUsuario` reintenta sin ella y la persistencia va
+en su propio try/catch.
+
+> **Nota:** los precios de suscripción (`suscripcion.ts`) siguen en CLP porque el
+> cobro va por Mercado Pago Chile. La multimoneda aplica a los **registros del
+> usuario**, no al billing (que es otra decisión por país).
 
 ## Registro multi-movimiento
 

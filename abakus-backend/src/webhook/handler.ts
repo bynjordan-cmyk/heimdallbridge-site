@@ -4,7 +4,7 @@ import { yaProcesado } from '../utils/idempotency';
 import { getUsuarioByPhone, updateUsuario, agregarAprendizaje, getUltimoMovimiento } from '../supabase/queries';
 import { interpretar } from '../claude/interpreter';
 import { construirPerfil } from '../aprendizaje/perfil';
-import { clp } from '../utils/format';
+import { esMonedaSoportada, formatMonto } from '../utils/format';
 import { sendText } from '../whatsapp/sender';
 import { enOnboarding, iniciarOnboarding, invitacionPrimerRegistro } from '../flows/onboarding';
 import { handleRegistro, registrarMovimientos } from '../flows/registro';
@@ -153,7 +153,7 @@ async function procesar(mensaje: MensajeEntrante): Promise<void> {
       await sendText(mensaje.phone, 'No encontré movimientos recientes para borrar 🤔');
     } else {
       const ref = mov.correlativo != null ? ` #${mov.correlativo}` : '';
-      const detalle = [clp(Number(mov.monto)), mov.categoria, mov.descripcion].filter(Boolean).join(' | ');
+      const detalle = [formatMonto(Number(mov.monto), usuario.moneda), mov.categoria, mov.descripcion].filter(Boolean).join(' | ');
       await sendText(mensaje.phone, `🗑️ Borré el movimiento${ref}:\n${mov.tipo === 'ingreso' ? '💰' : '💸'} ${detalle}`);
     }
     return;
@@ -175,9 +175,13 @@ async function procesar(mensaje: MensajeEntrante): Promise<void> {
         ultimo.correlativo != null ? ` (#${ultimo.correlativo})` : ''
       } (úsalo si el mensaje corrige o se refiere a algo recién registrado): ${
         ultimo.tipo
-      } de ${clp(Number(ultimo.monto))}${ultimo.categoria ? ` en "${ultimo.categoria}"` : ''}.`
+      } de ${formatMonto(Number(ultimo.monto), usuario.moneda)}${ultimo.categoria ? ` en "${ultimo.categoria}"` : ''}.`
     : '';
-  const interp = await interpretar(mensaje.texto, { nombre: usuario.nombre, perfil: perfil + ctxUltimo });
+  const interp = await interpretar(mensaje.texto, {
+    nombre: usuario.nombre,
+    perfil: perfil + ctxUltimo,
+    moneda: usuario.moneda,
+  });
 
   // Persistir lo que Abakus aprendió de este mensaje (nombre, negocio, tono, memoria).
   await persistirAprendizaje(usuario, interp);
@@ -258,7 +262,7 @@ async function salirDeOnboarding(usuario: Usuario): Promise<void> {
  * (ej. si aún no existe la columna `memoria` en la DB).
  */
 async function persistirAprendizaje(usuario: Usuario, interp: Interpretacion): Promise<void> {
-  const campos: Partial<Pick<Usuario, 'nombre' | 'negocio' | 'tono'>> = {};
+  const campos: Partial<Pick<Usuario, 'nombre' | 'negocio' | 'tono' | 'moneda'>> = {};
 
   if (interp.nombre && interp.nombre !== usuario.nombre) {
     campos.nombre = interp.nombre;
@@ -272,7 +276,6 @@ async function persistirAprendizaje(usuario: Usuario, interp: Interpretacion): P
     campos.tono = interp.tono;
     usuario.tono = interp.tono;
   }
-
   try {
     if (Object.keys(campos).length > 0) {
       await updateUsuario(usuario.phone, campos);
@@ -282,5 +285,18 @@ async function persistirAprendizaje(usuario: Usuario, interp: Interpretacion): P
     }
   } catch (err) {
     console.error('[abakus][aprendizaje] No se pudo persistir el aprendizaje:', err);
+  }
+
+  // Moneda aparte: solo si la persona mencionó una soportada y distinta a la
+  // actual. En su propio try/catch para que una columna `moneda` aún no migrada
+  // no bloquee el resto del aprendizaje.
+  const monedaDetectada = interp.moneda?.toUpperCase();
+  if (monedaDetectada && esMonedaSoportada(monedaDetectada) && monedaDetectada !== usuario.moneda) {
+    usuario.moneda = monedaDetectada;
+    try {
+      await updateUsuario(usuario.phone, { moneda: monedaDetectada });
+    } catch (err) {
+      console.error('[abakus][moneda] No se pudo persistir la moneda:', err);
+    }
   }
 }

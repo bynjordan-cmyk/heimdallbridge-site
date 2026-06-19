@@ -1,5 +1,6 @@
 import { createUsuario } from '../supabase/queries';
 import { Usuario } from '../types';
+import { formatMonto, monedaPorTelefono } from '../utils/format';
 
 /**
  * Estado de conversación durante el onboarding guiado: el usuario acaba de
@@ -34,6 +35,9 @@ export function invitacionPrimerRegistro(user: Usuario): string {
     ? `¡Genial! 🙌 Tomo nota.`
     : `¡Perfecto! 🙌`;
 
+  const moneda = user.moneda ?? 'CLP';
+  const ejemplo = formatMonto(80000, moneda);
+
   return `${intro} Probemos ahora: escríbeme tu *primer movimiento* en lenguaje natural. Por ejemplo:
 
 💰 _"vendí 80000 en diseño web"_
@@ -43,11 +47,16 @@ export function invitacionPrimerRegistro(user: Usuario): string {
 💡 ¿Quieres traer lo de estos días de una vez? Mándamelos todos juntos en un mensaje:
 _"vendí 50 mil el lunes, pagué 20 mil de arriendo y gasté 8 mil en bencina"_
 
+💱 Registraré tus montos en *${moneda}* (ej. ${ejemplo}). Si usas otra moneda, solo dímelo (ej. _"uso dólares"_).
+
 Cuando quieras tu balance, escribe *resumen*. Y *ayuda* para ver todo lo que puedo hacer.`;
 }
 
-/** Paso 1: usuario nuevo. Crea el registro (en onboarding) y devuelve la bienvenida. */
+/**
+ * Paso 1: usuario nuevo. Crea el registro (en onboarding), infiriendo la moneda
+ * del prefijo telefónico, y devuelve la bienvenida.
+ */
 export async function iniciarOnboarding(phone: string, nombre: string | null): Promise<string> {
-  await createUsuario(phone, nombre, ONB_NEGOCIO);
+  await createUsuario(phone, nombre, ONB_NEGOCIO, monedaPorTelefono(phone));
   return BIENVENIDA(nombre);
 }

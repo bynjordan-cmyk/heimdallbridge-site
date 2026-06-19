@@ -16,17 +16,25 @@ export async function createUsuario(
   phone: string,
   nombre: string | null,
   estadoConversacion: string | null = null,
+  moneda: string | null = null,
 ): Promise<Usuario> {
   const fila: Record<string, unknown> = { phone, nombre };
   if (estadoConversacion !== null) fila.estado_conversacion = estadoConversacion;
+  if (moneda !== null) fila.moneda = moneda;
 
-  const { data, error } = await supabase
-    .from('usuarios')
-    .insert(fila)
-    .select()
-    .single();
+  const { data, error } = await supabase.from('usuarios').insert(fila).select().single();
 
-  if (error) throw error;
+  if (error) {
+    // Degrada con gracia si la columna `moneda` aún no existe en la DB:
+    // reintenta sin ella para no romper el alta del usuario (onboarding).
+    if (moneda !== null) {
+      delete fila.moneda;
+      const retry = await supabase.from('usuarios').insert(fila).select().single();
+      if (retry.error) throw retry.error;
+      return retry.data as Usuario;
+    }
+    throw error;
+  }
   return data as Usuario;
 }
 
@@ -34,7 +42,7 @@ export async function createUsuario(
 export async function updateUsuario(
   phone: string,
   campos: Partial<
-    Pick<Usuario, 'nombre' | 'email' | 'estado_conversacion' | 'plan' | 'activo' | 'negocio' | 'tono' | 'memoria'>
+    Pick<Usuario, 'nombre' | 'email' | 'estado_conversacion' | 'plan' | 'activo' | 'negocio' | 'tono' | 'memoria' | 'moneda'>
   >,
 ): Promise<void> {
   const { error } = await supabase.from('usuarios').update(campos).eq('phone', phone);

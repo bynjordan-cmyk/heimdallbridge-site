@@ -3,7 +3,7 @@ import { downloadMedia, sendDocument } from '../whatsapp/sender';
 import { parsearMovimientosExcel } from '../reports/importExcel';
 import { generarPlantillaExcel } from '../reports/excel';
 import { insertMovimientosMasivo } from '../supabase/queries';
-import { clp } from '../utils/format';
+import { formatMonto } from '../utils/format';
 
 const MIME_XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 const MAX_ERRORES_MOSTRADOS = 5;
@@ -42,7 +42,8 @@ export async function handleCargaMasiva(user: Usuario, doc: DocumentoEntrante): 
   const totalIngresos = ingresos.reduce((s, m) => s + m.monto, 0);
   const totalEgresos = egresos.reduce((s, m) => s + m.monto, 0);
 
-  let msg = `✅ *Carga masiva completa*\n\n📥 ${validos.length} movimiento${validos.length !== 1 ? 's' : ''} registrado${validos.length !== 1 ? 's' : ''}\n💰 Ingresos: ${clp(totalIngresos)} (${ingresos.length})\n💸 Egresos: ${clp(totalEgresos)} (${egresos.length})`;
+  const f = (n: number) => formatMonto(n, user.moneda);
+  let msg = `✅ *Carga masiva completa*\n\n📥 ${validos.length} movimiento${validos.length !== 1 ? 's' : ''} registrado${validos.length !== 1 ? 's' : ''}\n💰 Ingresos: ${f(totalIngresos)} (${ingresos.length})\n💸 Egresos: ${f(totalEgresos)} (${egresos.length})`;
 
   if (errores.length > 0) {
     const detalle = errores.slice(0, MAX_ERRORES_MOSTRADOS).join('\n');
