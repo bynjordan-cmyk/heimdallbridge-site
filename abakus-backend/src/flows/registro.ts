@@ -4,9 +4,11 @@ import {
   eliminarMovimiento,
   actualizarMovimiento,
   insertCuentaPorCobrar,
+  insertCuentaPorPagar,
   insertMovimiento,
   insertMovimientosMasivo,
   marcarCobrado,
+  marcarSaldado,
   getMovimientosPeriodo,
 } from '../supabase/queries';
 
@@ -33,6 +35,16 @@ export async function handleRegistro(
       return `Mmm, no encontré ninguna cuenta ${quien} activa 🤔 ¿Ya la habías marcado antes?`;
     }
     return `✅ ¡Cobro registrado!\n👤 ${cuenta.contraparte ?? 'Sin contraparte'} | ${f(Number(cuenta.monto))} marcado como *pagado*. 🎉`;
+  }
+
+  // === Saldar una cuenta por pagar (el usuario pagó lo que debía) ===
+  if (interp.tipo === 'saldar') {
+    const cuenta = await marcarSaldado(user.phone, interp.contraparte, interp.monto);
+    if (!cuenta) {
+      const quien = interp.contraparte ? `a *${interp.contraparte}*` : 'por pagar';
+      return `Mmm, no encontré ninguna cuenta ${quien} pendiente 🤔 ¿Ya la habías saldado?`;
+    }
+    return `✅ ¡Pago registrado!\n👤 ${cuenta.contraparte ?? 'Sin contraparte'} | ${f(Number(cuenta.monto))} marcado como *saldado*. 🎉`;
   }
 
   // === Corregir un movimiento (por #referencia o el último) ===
@@ -86,32 +98,35 @@ export async function handleRegistro(
     return `🗑️ Listo, borré el movimiento${refTag(mov.correlativo)}:\n${emoji} ${detalle}`;
   }
 
-  // === Deuda (cuenta por cobrar) requiere monto ===
+  // === Deuda (cobrar) y cuenta por pagar requieren monto ===
   if (interp.monto === null) {
     return 'Entendí que quieres registrar algo, pero no detecté el monto 🤔 ¿Cuánto fue?';
   }
 
-  // tipo === 'deuda' → cuenta por cobrar
-  // Plan Básico: máximo 3 cuentas activas.
+  const esPorPagar = interp.tipo === 'cuenta_pagar';
+  const tipoCuenta = esPorPagar ? 'por_pagar' : 'por_cobrar';
+  const etiqueta = esPorPagar ? 'por pagar' : 'por cobrar';
+
+  // Plan Básico: máximo 3 cuentas activas por tipo.
   if (user.plan === 'basico') {
-    const activas = await contarCuentasPendientes(user.phone);
+    const activas = await contarCuentasPendientes(user.phone, tipoCuenta);
     if (activas >= LIMITE_CUENTAS_BASICO) {
-      return `⚠️ Con el *Plan Básico* puedes tener hasta ${LIMITE_CUENTAS_BASICO} cuentas por cobrar activas.\n\nMarca alguna como cobrada o actualiza al *Plan Pro* escribiendo *suscribirme* para tener cuentas ilimitadas. 🚀`;
+      return `⚠️ Con el *Plan Básico* puedes tener hasta ${LIMITE_CUENTAS_BASICO} cuentas ${etiqueta} activas.\n\nMarca alguna como pagada o actualiza al *Plan Pro* escribiendo *suscribirme* para tener cuentas ilimitadas. 🚀`;
     }
   }
 
-  await insertCuentaPorCobrar({
+  const datos = {
     userPhone: user.phone,
     contraparte: interp.contraparte,
     monto: interp.monto,
     descripcion: interp.descripcion,
     fechaVencimiento: interp.fecha_vencimiento,
-  });
+  };
+  await (esPorPagar ? insertCuentaPorPagar(datos) : insertCuentaPorCobrar(datos));
 
   const vence = interp.fecha_vencimiento ? ` | vence ${interp.fecha_vencimiento}` : '';
-  return `📋 Cuenta por cobrar registrada\n👤 ${
-    interp.contraparte ?? 'Sin contraparte'
-  } | ${f(interp.monto)}${vence}`;
+  const titulo = esPorPagar ? '📌 Cuenta por pagar registrada' : '📋 Cuenta por cobrar registrada';
+  return `${titulo}\n👤 ${interp.contraparte ?? 'Sin contraparte'} | ${f(interp.monto)}${vence}`;
 }
 
 /** Fecha de hoy en YYYY-MM-DD (default cuando el movimiento no trae fecha). */

@@ -36,6 +36,7 @@ export async function generarReporteExcel(
   periodo: Periodo,
   nombreUsuario: string | null,
   moneda?: string | null,
+  cuentasPorPagar: CuentaPorCobrar[] = [],
 ): Promise<Buffer> {
   const wb = new ExcelJS.Workbook();
   wb.creator = 'Abakus';
@@ -50,7 +51,10 @@ export async function generarReporteExcel(
   agregarHojaResumen(wb, periodo, nombreUsuario, totalIngresos, totalEgresos, balance, movimientos, moneda);
   agregarHojaMovimientos(wb, movimientos, periodo, moneda);
   if (cuentas.length > 0) {
-    agregarHojaCuentas(wb, cuentas, moneda);
+    agregarHojaCuentas(wb, cuentas, { hoja: 'Cuentas por Cobrar', titulo: 'Cuentas por Cobrar Pendientes' }, moneda);
+  }
+  if (cuentasPorPagar.length > 0) {
+    agregarHojaCuentas(wb, cuentasPorPagar, { hoja: 'Cuentas por Pagar', titulo: 'Cuentas por Pagar Pendientes' }, moneda);
   }
 
   const buf = await wb.xlsx.writeBuffer();
@@ -324,10 +328,11 @@ export async function generarPlantillaExcel(): Promise<Buffer> {
 function agregarHojaCuentas(
   wb: ExcelJS.Workbook,
   cuentas: CuentaPorCobrar[],
+  opts: { hoja: string; titulo: string },
   moneda?: string | null,
 ): void {
   const f = (n: number) => formatMonto(n, moneda);
-  const ws = wb.addWorksheet('Cuentas por Cobrar');
+  const ws = wb.addWorksheet(opts.hoja);
   ws.columns = [
     { width: 24 },
     { width: 18 },
@@ -338,7 +343,7 @@ function agregarHojaCuentas(
 
   ws.mergeCells('A1:E1');
   const t = ws.getCell('A1');
-  t.value = 'Cuentas por Cobrar Pendientes';
+  t.value = opts.titulo;
   t.font = cellFont(true, 'FFFFFF', 13);
   t.fill = fillSolid(COLOR_HEADER);
   t.alignment = { horizontal: 'center', vertical: 'middle' };

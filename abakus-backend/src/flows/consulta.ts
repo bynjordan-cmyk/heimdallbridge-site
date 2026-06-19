@@ -1,5 +1,5 @@
 import { Movimiento, Usuario } from '../types';
-import { getCuentasPendientes, getMovimientosPeriodo, setMeta } from '../supabase/queries';
+import { getCuentasPendientes, getCuentasPorPagar, getMovimientosPeriodo, setMeta } from '../supabase/queries';
 import { formatMonto } from '../utils/format';
 import {
   diferenciaMeses,
@@ -10,7 +10,7 @@ import {
   periodoMesesAtras,
 } from '../reports/periodo';
 
-export type ComandoEspecial = 'resumen' | 'cobros' | 'ayuda' | 'pago' | 'planes' | 'reporte' | 'eliminar' | 'comparar' | 'meta' | 'proyeccion' | 'plantilla';
+export type ComandoEspecial = 'resumen' | 'cobros' | 'porpagar' | 'ayuda' | 'pago' | 'planes' | 'reporte' | 'eliminar' | 'comparar' | 'meta' | 'proyeccion' | 'plantilla';
 
 const MESES_ES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 const tieneMes = (s: string) => MESES_ES.some((m) => s.includes(m));
@@ -19,7 +19,13 @@ export function detectarComando(texto: string): ComandoEspecial | null {
   const t = texto.trim().toLowerCase();
   if (t === 'resumen' || t === 'saldo') return 'resumen';
   if ((t.startsWith('resumen') || t.startsWith('saldo')) && tieneMes(t)) return 'resumen';
-  if (t === 'cobros' || t === 'pendientes') return 'cobros';
+  if (
+    t === 'por pagar' || t === 'cuentas por pagar' || t === 'porpagar' ||
+    t === 'pagos pendientes' || t === 'qué debo' || t === 'que debo' ||
+    t === 'qué pago' || t === 'que pago' || t === 'mis deudas' || t === 'deudas' ||
+    t === 'a quién le debo' || t === 'a quien le debo'
+  ) return 'porpagar';
+  if (t === 'cobros' || t === 'pendientes' || t === 'por cobrar' || t === 'me deben') return 'cobros';
   if (t === 'ayuda' || t === 'help' || t === 'menu' || t === 'menú') return 'ayuda';
   if (
     t === 'pagar' || t === 'suscribirme' || t === 'suscribir' ||
@@ -60,7 +66,8 @@ const AYUDA = `🧮 *Abakus* — esto es lo que puedo hacer:
 • *resumen mayo* → balance de cualquier mes anterior.
 • *proyección julio* → estimado de un mes futuro según tu historial.
 • *comparar* → este mes vs el mes pasado.
-• *cobros* → tus cuentas por cobrar activas.
+• *cobros* → lo que te deben (cuentas por cobrar). "Juan me debe 30000".
+• *por pagar* → lo que tú debes (cuentas por pagar). "le debo 20000 a Ana" · "ya le pagué a Ana".
 • *reporte* → Excel con detalle completo (o "reporte mayo").
 • *meta 1500000* → fija tu objetivo mensual de ingresos (opcional).
 • "Juan me pagó" → marca la deuda como cobrada.
@@ -101,6 +108,21 @@ export async function handleComando(
     const periodo = esMesActual ? mesActual() : parsearPeriodo(t);
     const movs = await getMovimientosPeriodo(user.phone, periodo.desde, periodo.hasta);
     return formatearResumen(movs, periodo.label, esMesActual, esMesActual ? user.meta_mensual : null, user.moneda);
+  }
+
+  if (comando === 'porpagar') {
+    const cuentas = await getCuentasPorPagar(user.phone);
+    if (cuentas.length === 0) {
+      return '🎉 No tienes cuentas por pagar pendientes.';
+    }
+    const lineas = cuentas
+      .map((c) => {
+        const vence = c.fecha_vencimiento ? ` (vence ${c.fecha_vencimiento})` : '';
+        return `• ${c.contraparte ?? 'Sin contraparte'}: ${f(Number(c.monto))}${vence}`;
+      })
+      .join('\n');
+    const total = cuentas.reduce((acc, c) => acc + Number(c.monto), 0);
+    return `📌 *Cuentas por pagar pendientes*\n${lineas}\n\nTotal a pagar: ${f(total)}`;
   }
 
   // comando === 'cobros'

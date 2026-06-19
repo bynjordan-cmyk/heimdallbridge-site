@@ -241,18 +241,23 @@ export async function insertMovimientosMasivo(
   return insertados;
 }
 
-export async function insertCuentaPorCobrar(input: {
-  userPhone: string;
-  contraparte: string | null;
-  monto: number;
-  descripcion: string | null;
-  fechaVencimiento: string | null;
-}): Promise<CuentaPorCobrar> {
+export type TipoCuenta = 'por_cobrar' | 'por_pagar';
+
+async function insertCuenta(
+  tipo: TipoCuenta,
+  input: {
+    userPhone: string;
+    contraparte: string | null;
+    monto: number;
+    descripcion: string | null;
+    fechaVencimiento: string | null;
+  },
+): Promise<CuentaPorCobrar> {
   const { data, error } = await supabase
     .from('cuentas_pendientes')
     .insert({
       user_phone: input.userPhone,
-      tipo: 'por_cobrar',
+      tipo,
       contraparte: input.contraparte,
       monto: input.monto,
       descripcion: input.descripcion,
@@ -263,6 +268,28 @@ export async function insertCuentaPorCobrar(input: {
 
   if (error) throw error;
   return data as CuentaPorCobrar;
+}
+
+/** Registra una cuenta por cobrar (alguien le debe al usuario). */
+export function insertCuentaPorCobrar(input: {
+  userPhone: string;
+  contraparte: string | null;
+  monto: number;
+  descripcion: string | null;
+  fechaVencimiento: string | null;
+}): Promise<CuentaPorCobrar> {
+  return insertCuenta('por_cobrar', input);
+}
+
+/** Registra una cuenta por pagar (el usuario le debe a alguien). */
+export function insertCuentaPorPagar(input: {
+  userPhone: string;
+  contraparte: string | null;
+  monto: number;
+  descripcion: string | null;
+  fechaVencimiento: string | null;
+}): Promise<CuentaPorCobrar> {
+  return insertCuenta('por_pagar', input);
 }
 
 export interface ResumenMes {
@@ -312,22 +339,30 @@ export async function getMovimientosPeriodo(
   return (data ?? []) as Movimiento[];
 }
 
-export async function contarCuentasPendientes(userPhone: string): Promise<number> {
+export async function contarCuentasPendientes(
+  userPhone: string,
+  tipo: TipoCuenta = 'por_cobrar',
+): Promise<number> {
   const { count, error } = await supabase
     .from('cuentas_pendientes')
     .select('id', { count: 'exact', head: true })
     .eq('user_phone', userPhone)
+    .eq('tipo', tipo)
     .eq('pagado', false);
 
   if (error) throw error;
   return count ?? 0;
 }
 
-export async function getCuentasPendientes(userPhone: string): Promise<CuentaPorCobrar[]> {
+export async function getCuentasPendientes(
+  userPhone: string,
+  tipo: TipoCuenta = 'por_cobrar',
+): Promise<CuentaPorCobrar[]> {
   const { data, error } = await supabase
     .from('cuentas_pendientes')
     .select('*')
     .eq('user_phone', userPhone)
+    .eq('tipo', tipo)
     .eq('pagado', false)
     .order('fecha_vencimiento', { ascending: true, nullsFirst: false });
 
@@ -335,11 +370,17 @@ export async function getCuentasPendientes(userPhone: string): Promise<CuentaPor
   return (data ?? []) as CuentaPorCobrar[];
 }
 
+/** Atajo: cuentas por pagar pendientes (lo que el usuario debe). */
+export function getCuentasPorPagar(userPhone: string): Promise<CuentaPorCobrar[]> {
+  return getCuentasPendientes(userPhone, 'por_pagar');
+}
+
 /**
- * Marca como pagada la cuenta más reciente que coincida con la contraparte (y monto, si se da).
- * Devuelve la cuenta actualizada, o null si no encontró ninguna.
+ * Marca como pagada la cuenta más reciente del tipo indicado que coincida con la
+ * contraparte (y monto, si se da). Devuelve la cuenta actualizada, o null.
  */
-export async function marcarCobrado(
+async function marcarPagada(
+  tipo: TipoCuenta,
   userPhone: string,
   contraparte: string | null,
   monto: number | null,
@@ -348,6 +389,7 @@ export async function marcarCobrado(
     .from('cuentas_pendientes')
     .select('*')
     .eq('user_phone', userPhone)
+    .eq('tipo', tipo)
     .eq('pagado', false)
     .order('created_at', { ascending: false })
     .limit(1);
@@ -371,6 +413,24 @@ export async function marcarCobrado(
 
   if (updateError) throw updateError;
   return cuenta;
+}
+
+/** Marca una cuenta por cobrar como cobrada (alguien le pagó al usuario). */
+export function marcarCobrado(
+  userPhone: string,
+  contraparte: string | null,
+  monto: number | null,
+): Promise<CuentaPorCobrar | null> {
+  return marcarPagada('por_cobrar', userPhone, contraparte, monto);
+}
+
+/** Marca una cuenta por pagar como saldada (el usuario pagó lo que debía). */
+export function marcarSaldado(
+  userPhone: string,
+  contraparte: string | null,
+  monto: number | null,
+): Promise<CuentaPorCobrar | null> {
+  return marcarPagada('por_pagar', userPhone, contraparte, monto);
 }
 
 /** Obtiene todos los usuarios activos (trial vigente o plan de pago). */

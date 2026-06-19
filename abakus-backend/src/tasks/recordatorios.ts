@@ -24,17 +24,26 @@ export async function enviarRecordatorios(): Promise<void> {
       const cuentas = await getCuentasPorVencer(user.phone, DIAS_AVISO);
       if (cuentas.length === 0) continue;
 
-      const lineas = cuentas.map((c) => {
+      const porCobrar = cuentas.filter((c) => c.tipo !== 'por_pagar');
+      const porPagar = cuentas.filter((c) => c.tipo === 'por_pagar');
+
+      const linea = (c: (typeof cuentas)[number]) => {
         const dias = diasHasta(c.fecha_vencimiento!);
         const cuandoLabel = dias === 0 ? 'hoy' : dias === 1 ? 'mañana' : `en ${dias} días`;
         return `• ${c.contraparte ?? 'Sin nombre'}: ${formatMonto(Number(c.monto), user.moneda)} _(vence ${cuandoLabel})_`;
-      }).join('\n');
+      };
 
-      const plural = cuentas.length > 1 ? 'cuentas por cobrar que vencen' : 'cuenta por cobrar que vence';
-      await sendText(
-        user.phone,
-        `⏰ *Recordatorio Abakus*\n\nTienes ${cuentas.length} ${plural} pronto:\n${lineas}\n\n¿Ya cobraste? Escríbeme "_[nombre] me pagó_" y lo marco al instante. 🙌`,
-      );
+      let cuerpo = '';
+      if (porCobrar.length > 0) {
+        const t = porCobrar.length > 1 ? 'cuentas por cobrar' : 'cuenta por cobrar';
+        cuerpo += `\n💰 *Por cobrar* (${porCobrar.length} ${t}):\n${porCobrar.map(linea).join('\n')}\n¿Ya cobraste? Escríbeme "_[nombre] me pagó_". 🙌\n`;
+      }
+      if (porPagar.length > 0) {
+        const t = porPagar.length > 1 ? 'cuentas por pagar' : 'cuenta por pagar';
+        cuerpo += `\n📌 *Por pagar* (${porPagar.length} ${t}):\n${porPagar.map(linea).join('\n')}\n¿Ya pagaste? Escríbeme "_ya le pagué a [nombre]_". ✅\n`;
+      }
+
+      await sendText(user.phone, `⏰ *Recordatorio Abakus*\nTienes movimientos que vencen pronto:\n${cuerpo}`);
 
       for (const c of cuentas) {
         await marcarRecordatorioEnviado(c.id);

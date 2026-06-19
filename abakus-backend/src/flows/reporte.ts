@@ -1,5 +1,5 @@
 import { Usuario } from '../types';
-import { getMovimientosPeriodo, getCuentasPendientes } from '../supabase/queries';
+import { getMovimientosPeriodo, getCuentasPendientes, getCuentasPorPagar } from '../supabase/queries';
 import { generarReporteExcel } from '../reports/excel';
 import { parsearPeriodo } from '../reports/periodo';
 import { sendText, sendDocument } from '../whatsapp/sender';
@@ -12,12 +12,13 @@ import { formatMonto } from '../utils/format';
 export async function handleReporte(user: Usuario, textoOriginal: string): Promise<void> {
   const periodo = parsearPeriodo(textoOriginal);
 
-  const [movimientos, cuentas] = await Promise.all([
+  const [movimientos, cuentas, cuentasPorPagar] = await Promise.all([
     getMovimientosPeriodo(user.phone, periodo.desde, periodo.hasta),
     getCuentasPendientes(user.phone),
+    getCuentasPorPagar(user.phone),
   ]);
 
-  const buffer = await generarReporteExcel(movimientos, cuentas, periodo, user.nombre, user.moneda);
+  const buffer = await generarReporteExcel(movimientos, cuentas, periodo, user.nombre, user.moneda, cuentasPorPagar);
 
   const filename = `abakus-reporte-${periodo.label.toLowerCase().replace(' ', '-')}.xlsx`;
 

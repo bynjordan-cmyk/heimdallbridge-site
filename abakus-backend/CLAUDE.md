@@ -225,9 +225,26 @@ abakus-backend/
 ### Comandos especiales (v1) — no pasan por Claude
 
 - `resumen` / `saldo` → ingresos vs egresos del mes
-- `cobros` / `pendientes` → cuentas por cobrar pendientes
+- `cobros` / `pendientes` → cuentas por cobrar pendientes (lo que te deben)
+- `por pagar` / `mis deudas` / `qué debo` → cuentas por pagar pendientes (lo que debes)
 - `ayuda` → menú de comandos
 - `plantilla` → envía un Excel (.xlsx) de plantilla para carga masiva
+
+### Cuentas por cobrar vs por pagar
+
+La tabla `cuentas_pendientes` tiene un campo `tipo` (`por_cobrar` | `por_pagar`).
+El modelo es simétrico y NO genera movimientos (igual que las por cobrar):
+
+- **Por cobrar:** `deuda` (registrar: "Juan me debe 30000") · `cobro` (saldar:
+  "Juan me pagó") · comando `cobros`.
+- **Por pagar:** `cuenta_pagar` (registrar: "le debo 20000 a Ana", "tengo que
+  pagar el arriendo el 5") · `saldar` (liquidar: "ya le pagué a Ana") · comando
+  `por pagar`.
+
+Claude distingue `cuenta_pagar` (obligación pendiente) de `egreso` (dinero que
+ya salió), y `saldar` (liquida una deuda registrada) de un `egreso` nuevo. Las
+queries de cuentas filtran por `tipo` para no mezclar ambos lados. Los
+recordatorios (cron 9 AM) y el reporte Excel ya cubren ambos tipos.
 
 ## Onboarding guiado
 

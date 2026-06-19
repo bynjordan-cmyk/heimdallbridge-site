@@ -211,8 +211,9 @@ async function procesar(mensaje: MensajeEntrante): Promise<void> {
   }
   const tieneMovs = items.length > 0;
 
-  // cobro, eliminar y corregir detectados por Claude también pasan por handleRegistro.
+  // deuda, cobro, cuenta_pagar, saldar, eliminar y corregir también pasan por handleRegistro.
   const esAccionDatos = tieneMovs || interp.tipo === 'deuda' || interp.tipo === 'cobro' ||
+    interp.tipo === 'cuenta_pagar' || interp.tipo === 'saldar' ||
     interp.tipo === 'eliminar' || interp.tipo === 'corregir';
 
   // Onboarding paso 2: si está en el paso "¿a qué te dedicas?" y NO registró
@@ -227,8 +228,8 @@ async function procesar(mensaje: MensajeEntrante): Promise<void> {
     }
   }
 
-  // Candado de trial: solo bloquea nuevos registros (ingreso/egreso/deuda).
-  const requiereAcceso = tieneMovs || interp.tipo === 'deuda';
+  // Candado de trial: solo bloquea nuevos registros (ingreso/egreso/deuda/cuenta por pagar).
+  const requiereAcceso = tieneMovs || interp.tipo === 'deuda' || interp.tipo === 'cuenta_pagar';
   if (requiereAcceso && !accesoVigente(usuario)) {
     await sendText(mensaje.phone, mensajeTrialVencido());
     return;

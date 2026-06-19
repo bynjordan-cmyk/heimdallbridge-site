@@ -15,8 +15,10 @@ Interpretas mensajes de WhatsApp y devuelves un objeto JSON estructurado.
 TIPOS posibles:
 - "ingreso": el usuario recibió o cobró dinero (vendí, cobré, me pagaron, entró, recibí...)
 - "egreso": el usuario gastó o pagó algo (pagué, gasté, compré, salió, me cobró...)
-- "deuda": alguien le debe dinero al usuario (me debe, le presté, pendiente de cobro, queda debiendo...)
+- "deuda": alguien le debe dinero al usuario / cuenta por COBRAR (me debe, le presté, pendiente de cobro, queda debiendo, me quedaron debiendo...)
 - "cobro": alguien pagó una deuda que tenía con el usuario (me pagó, me saldó, ya cobré a, recibí el pago de...)
+- "cuenta_pagar": el usuario DEBE dinero a alguien o tiene un pago pendiente a futuro / cuenta por PAGAR (le debo a, tengo que pagar, quedé debiendo, debo el arriendo, hay que pagarle a, vence mi cuota...). Distíntelo de "egreso": egreso = ya salió el dinero; cuenta_pagar = obligación pendiente, aún no pagada.
+- "saldar": el usuario pagó una cuenta por pagar que tenía pendiente (ya le pagué a, salde la deuda, pagué lo que debía, cancelé la cuota de...). Distíntelo de "egreso": "saldar" liquida una deuda registrada antes; si nunca registró esa deuda, probablemente es un "egreso".
 - "eliminar": el usuario quiere borrar el último movimiento registrado (me equivoqué, borra el último, deshacer, undo, error...)
 - "corregir": el usuario quiere MODIFICAR un movimiento que registró, no borrarlo (ej. "no, eran 3 mil", "modifica el monto a 5000", "lo pusiste mal, eran 2000", "cambia la categoría a transporte", "fueron solo 3mil", "corrige el #5 a 2000"). Devuelve en monto/categoria/descripcion SOLO los valores corregidos; deja en null lo que no cambia.
 - "consulta": pregunta sobre sus datos, saludos, presentaciones de nombre, agradecimientos, o cualquier mensaje fuera de registro
@@ -27,7 +29,7 @@ MOVIMIENTOS (lo más importante para registrar ingresos y egresos):
 - Incluso un único ingreso/egreso va en "movimientos" (como un arreglo de 1 elemento).
 - Cada movimiento lleva: "tipo" (ingreso|egreso), "monto" (number), "categoria" (string|null), "descripcion" (string|null) y "fecha" ("YYYY-MM-DD" o null).
 - "fecha": HOY es ${'${HOY}'}. Resuelve fechas relativas a hoy ("ayer", "antier", "el lunes", "el 3 de mayo", "la semana pasada") a "YYYY-MM-DD". Si el usuario NO menciona cuándo, fecha = null (se asume hoy).
-- Para tipos que NO son registro de ingreso/egreso (consulta, deuda, cobro, eliminar, corregir, desconocido), "movimientos" = [] (arreglo vacío).
+- Para tipos que NO son registro de ingreso/egreso (consulta, deuda, cobro, cuenta_pagar, saldar, eliminar, corregir, desconocido), "movimientos" = [] (arreglo vacío).
 - Cuando "movimientos" tiene elementos, "tipo" del nivel superior debe ser "ingreso" o "egreso" (el del primer/principal movimiento). Si el mensaje mezcla ingresos/egresos con una deuda, prioriza los ingresos/egresos en "movimientos" y menciona en "respuesta" que la deuda la registre por separado.
 - Los campos de dinero del nivel superior (monto/categoria/descripcion) son SOLO para "corregir". Para ingreso/egreso usa "movimientos"; déjalos en null arriba.
 
@@ -39,6 +41,8 @@ REGLAS:
 - "referencia": si el usuario menciona el NÚMERO de un movimiento para corregir o borrar (ej. "el #5", "el movimiento 5", "corrige el 3", "borra el número 7"), pon ese entero en "referencia". OJO: esto es el identificador del movimiento, NO confundir con el monto. Si no menciona un número de movimiento (se refiere al último o a ninguno), referencia = null.
 - No inventes datos: si no hay monto claro para un movimiento, no lo agregues a "movimientos".
 - Para "cobro": contraparte = quien pagó, monto = cuánto pagó (o null si no lo dice).
+- Para "deuda" y "cuenta_pagar": contraparte = la otra persona (a quién le cobra o a quién le debe), monto = el monto adeudado, fecha_vencimiento = cuándo vence si lo menciona ("YYYY-MM-DD").
+- Para "saldar": contraparte = a quién le pagó, monto = cuánto (o null).
 - Para "eliminar" y "consulta" y "desconocido": todos los campos de dinero = null y movimientos = [].
 - Si el usuario dice su nombre (ej: "me llamo Ana", "soy Pedro", "puedes llamarme Nhai"), extráelo en el campo "nombre". Si no menciona nombre, nombre = null.
 - NUNCA menciones un sitio web, app, portal ni plataforma externa. Abakus existe SOLO por WhatsApp.
@@ -66,7 +70,7 @@ const SCHEMA = {
   properties: {
     tipo: {
       type: 'string',
-      enum: ['ingreso', 'egreso', 'consulta', 'deuda', 'cobro', 'eliminar', 'corregir', 'desconocido'],
+      enum: ['ingreso', 'egreso', 'consulta', 'deuda', 'cobro', 'cuenta_pagar', 'saldar', 'eliminar', 'corregir', 'desconocido'],
     },
     nombre: { anyOf: [{ type: 'string' }, { type: 'null' }] },
     monto: { anyOf: [{ type: 'number' }, { type: 'null' }] },
@@ -121,6 +125,8 @@ const TIPOS_VALIDOS: TipoInterpretacion[] = [
   'consulta',
   'deuda',
   'cobro',
+  'cuenta_pagar',
+  'saldar',
   'eliminar',
   'corregir',
   'desconocido',
