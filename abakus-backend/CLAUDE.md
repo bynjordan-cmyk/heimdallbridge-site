@@ -180,7 +180,7 @@ abakus-backend/
 2. **GET `/webhook/abakus-whatsapp`** — valida `hub.verify_token` y responde `hub.challenge`.
 3. **Filtro mensajes reales** — ignora si no hay `entry[0].changes[0].value.messages[0]` de tipo `text`.
 4. **Buscar usuario** — `SELECT * FROM usuarios WHERE phone = $1`.
-5. **Usuario nuevo → Onboarding** — crea usuario (`estado = 'onboarding'`) y envía bienvenida.
+5. **Usuario nuevo → Onboarding guiado** — ver sección *Onboarding guiado*.
 6. **Usuario existe → Claude** — `claude-haiku-4-5` con structured outputs (`output_config.format`) devuelve:
    ```json
    {
@@ -188,11 +188,16 @@ abakus-backend/
      "monto": number|null, "categoria": string|null, "descripcion": string|null,
      "contraparte": string|null, "fecha_vencimiento": "YYYY-MM-DD"|null,
      "respuesta": string,
+     "movimientos": [{ "tipo": "ingreso|egreso", "monto": number, "categoria": string|null, "descripcion": string|null, "fecha": "YYYY-MM-DD"|null }],
+     "referencia": number|null,
      "negocio": string|null, "tono": string|null, "aprendizaje": string|null
    }
    ```
-   Antes de llamar a Claude se le inyecta el perfil del usuario y el **último
-   movimiento** registrado, para que las correcciones sepan a qué se refieren.
+   Antes de llamar a Claude se le inyecta el perfil del usuario, el **último
+   movimiento** registrado (para que las correcciones sepan a qué se refieren) y
+   la **fecha de hoy** (para resolver "ayer", "el lunes", etc. en `movimientos[].fecha`).
+   El array `movimientos` lleva **uno o varios** ingresos/egresos detectados en el
+   mismo mensaje (ver *Registro multi-movimiento*); va vacío para los demás tipos.
 7. **Guardar en Supabase** — ingreso/egreso → `movimientos`; deuda → `cuentas_pendientes`;
    `cobro` → marca cuenta pagada; `eliminar` → borra el último movimiento;
    `corregir` → actualiza el último movimiento (monto/categoría/descripción);
@@ -211,6 +216,44 @@ abakus-backend/
 - `cobros` / `pendientes` → cuentas por cobrar pendientes
 - `ayuda` → menú de comandos
 - `plantilla` → envía un Excel (.xlsx) de plantilla para carga masiva
+
+## Onboarding guiado
+
+El primer contacto de un usuario nuevo es un mini-flujo conversacional (100%
+WhatsApp, sin Excel) que busca una **primera victoria** rápida:
+
+1. **Bienvenida + 1ª pregunta** (`iniciarOnboarding`, `flows/onboarding.ts`): se
+   crea el usuario con `estado_conversacion = 'onboarding_negocio'`, se presenta a
+   Abakus y se le pregunta *"¿a qué te dedicas?"* (con opción de escribir
+   *saltar*).
+2. **Respuesta de negocio**: el siguiente mensaje pasa por Claude como siempre. Si
+   NO es un registro ni un comando, se asume que es su respuesta de negocio (ya
+   capturada por el aprendizaje en `usuarios.negocio`) y se le envía
+   `invitacionPrimerRegistro`: ejemplos de registro natural + la opción de mandar
+   **varios movimientos juntos** para traer su historial.
+3. **Salida del onboarding** (`salirDeOnboarding`, `webhook/handler.ts`): el estado
+   se limpia en cuanto el usuario hace algo distinto a responder (un registro, un
+   comando o un documento), de modo que el paso nunca lo deja atrapado.
+
+La **primera victoria** se detecta de forma stateless: cuando un movimiento se
+inserta con `correlativo === 1` (su primer movimiento), la confirmación incluye un
+mensaje celebratorio de cierre de onboarding (`PRIMERA_VICTORIA` en `registro.ts`).
+
+## Registro multi-movimiento
+
+Un mismo mensaje puede contener **varios** ingresos/egresos
+("vendí 50 mil el lunes, pagué 20 mil de arriendo y gasté 8 mil en bencina"):
+Claude los devuelve en el array `movimientos`, cada uno con su `tipo`, `monto`,
+`categoria`, `descripcion` y `fecha` (resuelta contra la fecha de hoy inyectada en
+el prompt; `null` = hoy). Es la vía nativa de WhatsApp para la **carga inicial**
+del historial, sin Excel.
+
+`registrarMovimientos` (`flows/registro.ts`) inserta 1 o N:
+- **1 movimiento** → confirmación detallada (con tip de ingreso o alerta de balance).
+- **Varios** → `insertMovimientosMasivo` en lote + resumen (cantidad y totales).
+
+Fallback: si el modelo marca `tipo` ingreso/egreso pero deja `movimientos` vacío,
+el handler arma un item con los campos del nivel superior.
 
 ### Carga masiva por Excel
 

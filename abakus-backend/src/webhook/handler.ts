@@ -6,8 +6,8 @@ import { interpretar } from '../claude/interpreter';
 import { construirPerfil } from '../aprendizaje/perfil';
 import { clp } from '../utils/format';
 import { sendText } from '../whatsapp/sender';
-import { handleOnboarding } from '../flows/onboarding';
-import { handleRegistro } from '../flows/registro';
+import { enOnboarding, iniciarOnboarding, invitacionPrimerRegistro } from '../flows/onboarding';
+import { handleRegistro, registrarMovimientos } from '../flows/registro';
 import { detectarComando, handleComando } from '../flows/consulta';
 import { handleReporte } from '../flows/reporte';
 import { handleCargaMasiva, handlePlantilla } from '../flows/carga';
@@ -96,9 +96,9 @@ async function procesar(mensaje: MensajeEntrante): Promise<void> {
 
   const usuario = await getUsuarioByPhone(mensaje.phone);
 
-  // Usuario nuevo → onboarding (crea registro y envía bienvenida).
+  // Usuario nuevo → onboarding guiado (crea registro y envía bienvenida + 1ª pregunta).
   if (!usuario) {
-    const bienvenida = await handleOnboarding(mensaje.phone, mensaje.nombre);
+    const bienvenida = await iniciarOnboarding(mensaje.phone, mensaje.nombre);
     await sendText(mensaje.phone, bienvenida);
     return;
   }
@@ -117,6 +117,7 @@ async function procesar(mensaje: MensajeEntrante): Promise<void> {
 
   // Carga masiva: el usuario envió un documento Excel.
   if (mensaje.documento) {
+    await salirDeOnboarding(usuario);
     if (!accesoVigente(usuario)) {
       await sendText(mensaje.phone, mensajeTrialVencido());
       return;
@@ -129,6 +130,7 @@ async function procesar(mensaje: MensajeEntrante): Promise<void> {
 
   // Comandos especiales: no pasan por Claude.
   const comando = detectarComando(mensaje.texto);
+  if (comando) await salirDeOnboarding(usuario);
   if (comando === 'pago') {
     const respuesta = await iniciarSuscripcion(usuario);
     await sendText(mensaje.phone, respuesta);
@@ -180,27 +182,73 @@ async function procesar(mensaje: MensajeEntrante): Promise<void> {
   // Persistir lo que Abakus aprendió de este mensaje (nombre, negocio, tono, memoria).
   await persistirAprendizaje(usuario, interp);
 
+  // Ingresos/egresos detectados (1 o varios). Fallback: si el modelo marcó el
+  // tipo pero no llenó el arreglo, armamos un item con los campos del nivel superior.
+  let items = interp.movimientos;
+  if (
+    items.length === 0 &&
+    (interp.tipo === 'ingreso' || interp.tipo === 'egreso') &&
+    interp.monto != null
+  ) {
+    items = [{
+      tipo: interp.tipo,
+      monto: interp.monto,
+      categoria: interp.categoria,
+      descripcion: interp.descripcion,
+      fecha: null,
+    }];
+  }
+  const tieneMovs = items.length > 0;
+
   // cobro, eliminar y corregir detectados por Claude también pasan por handleRegistro.
-  const esAccionDatos = interp.tipo === 'ingreso' || interp.tipo === 'egreso' ||
-    interp.tipo === 'deuda' || interp.tipo === 'cobro' || interp.tipo === 'eliminar' ||
-    interp.tipo === 'corregir';
+  const esAccionDatos = tieneMovs || interp.tipo === 'deuda' || interp.tipo === 'cobro' ||
+    interp.tipo === 'eliminar' || interp.tipo === 'corregir';
+
+  // Onboarding paso 2: si está en el paso "¿a qué te dedicas?" y NO registró
+  // nada, esto es su respuesta de negocio (ya guardada por el aprendizaje) →
+  // lo invitamos al primer registro. Si sí registró algo, salimos del onboarding
+  // y dejamos que fluya (con su celebración de primera victoria).
+  if (enOnboarding(usuario)) {
+    await salirDeOnboarding(usuario);
+    if (!esAccionDatos) {
+      await sendText(mensaje.phone, invitacionPrimerRegistro(usuario));
+      return;
+    }
+  }
 
   // Candado de trial: solo bloquea nuevos registros (ingreso/egreso/deuda).
-  const requiereAcceso = interp.tipo === 'ingreso' || interp.tipo === 'egreso' || interp.tipo === 'deuda';
+  const requiereAcceso = tieneMovs || interp.tipo === 'deuda';
   if (requiereAcceso && !accesoVigente(usuario)) {
     await sendText(mensaje.phone, mensajeTrialVencido());
     return;
   }
 
   let respuesta: string;
-  if (esAccionDatos) {
-    respuesta = await handleRegistro(usuario, interp, mensaje.texto);
+  if (tieneMovs) {
+    respuesta = await registrarMovimientos(usuario, items, mensaje.texto);
+  } else if (esAccionDatos) {
+    respuesta = await handleRegistro(usuario, interp);
   } else {
     // 'consulta' | 'desconocido' → usamos la respuesta del modelo.
     respuesta = interp.respuesta;
   }
 
   await sendText(mensaje.phone, respuesta);
+}
+
+/**
+ * Limpia el estado de onboarding en memoria y en la DB (idempotente). Se llama
+ * cuando el usuario hace algo distinto a responder la pregunta de onboarding
+ * (un comando, un documento o un registro). Nunca rompe el flujo principal.
+ */
+async function salirDeOnboarding(usuario: Usuario): Promise<void> {
+  if (!enOnboarding(usuario)) return;
+  usuario.estado_conversacion = null;
+  try {
+    await updateUsuario(usuario.phone, { estado_conversacion: null });
+  } catch (err) {
+    console.error('[abakus][onboarding] No se pudo limpiar el estado:', err);
+  }
 }
 
 /**

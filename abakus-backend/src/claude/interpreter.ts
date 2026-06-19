@@ -1,8 +1,13 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { config } from '../config';
-import { Interpretacion, TipoInterpretacion } from '../types';
+import { Interpretacion, MovimientoInterpretado, TipoInterpretacion, TipoMovimiento } from '../types';
 
 const client = new Anthropic({ apiKey: config.anthropic.apiKey });
+
+/** Fecha de hoy en formato YYYY-MM-DD (para resolver "ayer", "el lunes", etc.). */
+function hoyISO(): string {
+  return new Date().toISOString().slice(0, 10);
+}
 
 const SYSTEM_PROMPT = `Eres Abakus 🧮, asistente financiero por WhatsApp para freelancers y microempresarios de Chile y LATAM.
 Interpretas mensajes de WhatsApp y devuelves un objeto JSON estructurado.
@@ -17,13 +22,22 @@ TIPOS posibles:
 - "consulta": pregunta sobre sus datos, saludos, presentaciones de nombre, agradecimientos, o cualquier mensaje fuera de registro
 - "desconocido": el mensaje es ambiguo y necesita clarificación
 
+MOVIMIENTOS (lo más importante para registrar ingresos y egresos):
+- Cuando el mensaje describe uno O VARIOS ingresos/egresos, devuelve CADA uno como un elemento del arreglo "movimientos". Un mismo mensaje puede traer muchos (ej: "vendí 50 mil el lunes, pagué 20 mil de arriendo y gasté 8 mil en bencina" → 3 movimientos). Esto permite que el usuario cargue de una vez su historial sin Excel.
+- Incluso un único ingreso/egreso va en "movimientos" (como un arreglo de 1 elemento).
+- Cada movimiento lleva: "tipo" (ingreso|egreso), "monto" (number), "categoria" (string|null), "descripcion" (string|null) y "fecha" ("YYYY-MM-DD" o null).
+- "fecha": HOY es ${'${HOY}'}. Resuelve fechas relativas a hoy ("ayer", "antier", "el lunes", "el 3 de mayo", "la semana pasada") a "YYYY-MM-DD". Si el usuario NO menciona cuándo, fecha = null (se asume hoy).
+- Para tipos que NO son registro de ingreso/egreso (consulta, deuda, cobro, eliminar, corregir, desconocido), "movimientos" = [] (arreglo vacío).
+- Cuando "movimientos" tiene elementos, "tipo" del nivel superior debe ser "ingreso" o "egreso" (el del primer/principal movimiento). Si el mensaje mezcla ingresos/egresos con una deuda, prioriza los ingresos/egresos en "movimientos" y menciona en "respuesta" que la deuda la registre por separado.
+- Los campos de dinero del nivel superior (monto/categoria/descripcion) son SOLO para "corregir". Para ingreso/egreso usa "movimientos"; déjalos en null arriba.
+
 REGLAS:
 - Moneda CLP por defecto (Chile). Si dice "$50.000" o "50 mil" → monto = 50000.
 - "mil" en lenguaje coloquial chileno multiplica por 1000 SOLO cuando el número es chico: "3 mil"/"3mil" = 3000, "50 mil" = 50000. Pero si el número antes de "mil" ya es grande (≥1000), "mil" suele ser una muletilla y el monto es ese número tal cual: "3000 mil pesos" = 3000 (NO 3.000.000), "5000 mil" = 5000. Ante la duda, elige el monto más bajo y razonable.
 - "referencia": si el usuario menciona el NÚMERO de un movimiento para corregir o borrar (ej. "el #5", "el movimiento 5", "corrige el 3", "borra el número 7"), pon ese entero en "referencia". OJO: esto es el identificador del movimiento, NO confundir con el monto. Si no menciona un número de movimiento (se refiere al último o a ninguno), referencia = null.
-- No inventes datos: si no hay monto claro, monto = null.
+- No inventes datos: si no hay monto claro para un movimiento, no lo agregues a "movimientos".
 - Para "cobro": contraparte = quien pagó, monto = cuánto pagó (o null si no lo dice).
-- Para "eliminar" y "consulta" y "desconocido": todos los campos de dinero = null.
+- Para "eliminar" y "consulta" y "desconocido": todos los campos de dinero = null y movimientos = [].
 - Si el usuario dice su nombre (ej: "me llamo Ana", "soy Pedro", "puedes llamarme Nhai"), extráelo en el campo "nombre". Si no menciona nombre, nombre = null.
 - NUNCA menciones un sitio web, app, portal ni plataforma externa. Abakus existe SOLO por WhatsApp.
 - Si alguien pregunta por reportes o Excel, dile que escriba la palabra "reporte" para generarlo aquí mismo en WhatsApp.
@@ -58,6 +72,21 @@ const SCHEMA = {
     contraparte: { anyOf: [{ type: 'string' }, { type: 'null' }] },
     fecha_vencimiento: { anyOf: [{ type: 'string' }, { type: 'null' }] },
     respuesta: { type: 'string' },
+    movimientos: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          tipo: { type: 'string', enum: ['ingreso', 'egreso'] },
+          monto: { type: 'number' },
+          categoria: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+          descripcion: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+          fecha: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+        },
+        required: ['tipo', 'monto', 'categoria', 'descripcion', 'fecha'],
+        additionalProperties: false,
+      },
+    },
     referencia: { anyOf: [{ type: 'number' }, { type: 'null' }] },
     negocio: { anyOf: [{ type: 'string' }, { type: 'null' }] },
     tono: { anyOf: [{ type: 'string' }, { type: 'null' }] },
@@ -72,6 +101,7 @@ const SCHEMA = {
     'contraparte',
     'fecha_vencimiento',
     'respuesta',
+    'movimientos',
     'referencia',
     'negocio',
     'tono',
@@ -106,7 +136,7 @@ export async function interpretar(
   const response = await client.messages.create({
     model: config.anthropic.model,
     max_tokens: 1024,
-    system: SYSTEM_PROMPT + dato + perfil,
+    system: SYSTEM_PROMPT.replace('${HOY}', hoyISO()) + dato + perfil,
     messages: [{ role: 'user', content: texto }],
     output_config: { format: { type: 'json_schema', schema: SCHEMA } },
   });
@@ -143,6 +173,7 @@ function normalizar(raw: string): Interpretacion {
       typeof parsed.respuesta === 'string' && parsed.respuesta.trim().length > 0
         ? parsed.respuesta
         : RESPUESTA_FALLBACK,
+    movimientos: normalizarMovimientos(parsed.movimientos),
     referencia:
       typeof parsed.referencia === 'number' && Number.isFinite(parsed.referencia)
         ? Math.trunc(parsed.referencia)
@@ -156,4 +187,32 @@ function normalizar(raw: string): Interpretacion {
 /** Devuelve el string recortado si tiene contenido, o null. */
 function textoLimpio(valor: unknown): string | null {
   return typeof valor === 'string' && valor.trim().length > 0 ? valor.trim() : null;
+}
+
+const FECHA_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Valida el arreglo de movimientos: descarta entradas sin tipo válido o sin un
+ * monto numérico positivo. Las fechas que no sean YYYY-MM-DD se vuelven null (hoy).
+ */
+function normalizarMovimientos(valor: unknown): MovimientoInterpretado[] {
+  if (!Array.isArray(valor)) return [];
+
+  const out: MovimientoInterpretado[] = [];
+  for (const item of valor) {
+    if (!item || typeof item !== 'object') continue;
+    const m = item as Record<string, unknown>;
+    const tipo = m.tipo === 'ingreso' || m.tipo === 'egreso' ? (m.tipo as TipoMovimiento) : null;
+    const monto = typeof m.monto === 'number' && Number.isFinite(m.monto) && m.monto > 0 ? m.monto : null;
+    if (!tipo || monto === null) continue;
+
+    out.push({
+      tipo,
+      monto,
+      categoria: textoLimpio(m.categoria),
+      descripcion: textoLimpio(m.descripcion),
+      fecha: typeof m.fecha === 'string' && FECHA_RE.test(m.fecha) ? m.fecha : null,
+    });
+  }
+  return out;
 }

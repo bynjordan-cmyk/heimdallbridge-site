@@ -53,6 +53,19 @@ export interface CuentaPorCobrar {
 
 export type TipoInterpretacion = 'ingreso' | 'egreso' | 'consulta' | 'deuda' | 'cobro' | 'eliminar' | 'corregir' | 'desconocido';
 
+/**
+ * Un ingreso o egreso individual detectado dentro de un mensaje. Un solo mensaje
+ * puede contener varios ("vendí 50k el lunes, pagué 20k de arriendo, cobré 30k"),
+ * por lo que la interpretación devuelve una lista en `Interpretacion.movimientos`.
+ */
+export interface MovimientoInterpretado {
+  tipo: TipoMovimiento; // ingreso | egreso
+  monto: number;
+  categoria: string | null;
+  descripcion: string | null;
+  fecha: string | null; // YYYY-MM-DD si el usuario la menciona; null = hoy
+}
+
 export interface Interpretacion {
   tipo: TipoInterpretacion;
   nombre: string | null;
@@ -62,6 +75,9 @@ export interface Interpretacion {
   contraparte: string | null;
   fecha_vencimiento: string | null;
   respuesta: string;
+  // Ingresos/egresos detectados en el mensaje (0, 1 o varios). Vacío para
+  // consulta/deuda/cobro/eliminar/corregir/desconocido.
+  movimientos: MovimientoInterpretado[];
   // Correlativo del movimiento referido por el usuario (ej. "corrige el #5").
   referencia: number | null;
   // ===== Aprendizaje: datos que Claude extrae para recordar =====
