@@ -10,6 +10,8 @@ import {
   marcarCobrado,
   marcarSaldado,
   getMovimientosPeriodo,
+  buscarCuenta,
+  crearCuenta,
 } from '../supabase/queries';
 
 /** Etiqueta de correlativo, ej. " #42" (vacío si aún no hay numeración). */
@@ -49,11 +51,30 @@ export async function handleRegistro(
 
   // === Corregir un movimiento (por #referencia o el último) ===
   if (interp.tipo === 'corregir') {
+    // Si la corrección asigna/cambia la cuenta, la resolvemos (creándola si no
+    // existe) para obtener su id.
+    let cuentaId: string | undefined;
+    let nombreCuentaNueva: string | null = null;
+    let cuentaRecienCreada = false;
+    if (interp.cuenta) {
+      let cuenta = await buscarCuenta(user.phone, interp.cuenta);
+      if (!cuenta) {
+        const n = interp.cuenta.toLowerCase();
+        const tipoC = n.includes('caja') || n.includes('efectivo') || n.includes('billetera') ? 'caja' : 'banco';
+        const creada = await crearCuenta(user.phone, interp.cuenta, tipoC, 0);
+        cuenta = creada.cuenta;
+        cuentaRecienCreada = !creada.actualizada;
+      }
+      cuentaId = cuenta.id;
+      nombreCuentaNueva = cuenta.nombre;
+    }
+
     const res = await actualizarMovimiento(user.phone, interp.referencia, {
       tipo: interp.nuevo_tipo ?? undefined,
       monto: interp.monto ?? undefined,
       categoria: interp.categoria ?? undefined,
       descripcion: interp.descripcion ?? undefined,
+      cuenta_id: cuentaId,
     });
 
     if (!res) {
@@ -64,6 +85,9 @@ export async function handleRegistro(
 
     const { anterior, actualizado } = res;
     const cambios: string[] = [];
+    if (cuentaId && anterior.cuenta_id !== cuentaId && nombreCuentaNueva) {
+      cambios.push(`🏦 Cuenta: → *${nombreCuentaNueva}*${cuentaRecienCreada ? ' _(creada)_' : ''}`);
+    }
     if (anterior.tipo !== actualizado.tipo) {
       const nombreTipo = (t: string) => (t === 'ingreso' ? 'Ingreso' : 'Egreso');
       cambios.push(`🔄 Tipo: ${nombreTipo(anterior.tipo)} → *${nombreTipo(actualizado.tipo)}*`);

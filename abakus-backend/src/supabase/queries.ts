@@ -702,7 +702,7 @@ export interface MovimientoCorregido {
 export async function actualizarMovimiento(
   userPhone: string,
   correlativo: number | null,
-  cambios: Partial<Pick<Movimiento, 'tipo' | 'monto' | 'categoria' | 'descripcion'>>,
+  cambios: Partial<Pick<Movimiento, 'tipo' | 'monto' | 'categoria' | 'descripcion' | 'cuenta_id'>>,
 ): Promise<MovimientoCorregido | null> {
   const anterior = await getMovimientoObjetivo(userPhone, correlativo);
   if (!anterior) return null;
