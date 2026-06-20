@@ -11,9 +11,14 @@ import { generarReporteAprendizaje, renderHtmlAprendizaje } from './admin/report
 const app = express();
 app.use(express.json());
 
+// Commit y arranque, para saber QUÉ versión está desplegada (Railway expone
+// RAILWAY_GIT_COMMIT_SHA automáticamente). Termina la duda "¿se desplegó?".
+const VERSION = (process.env.RAILWAY_GIT_COMMIT_SHA ?? 'dev').slice(0, 7);
+const ARRANCO_EN = new Date().toISOString();
+
 // Healthcheck (Railway).
 app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', service: 'abakus' });
+  res.json({ status: 'ok', service: 'abakus', version: VERSION, startedAt: ARRANCO_EN });
 });
 
 // Webhook de WhatsApp Cloud API.
@@ -74,5 +79,5 @@ cron.schedule(
 );
 
 app.listen(config.port, () => {
-  console.log(`🧮 Abakus escuchando en puerto ${config.port} (${config.webhookPath})`);
+  console.log(`🧮 Abakus escuchando en puerto ${config.port} (${config.webhookPath}) · versión ${VERSION}`);
 });
