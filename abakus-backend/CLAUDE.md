@@ -293,6 +293,17 @@ Modelo de cuentas por usuario para llevar saldos reales.
 > ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS pendiente jsonb;
 > ```
 
+## Panel admin: salud del aprendizaje
+
+`GET /admin/aprendizaje?key=ADMIN_KEY` (`src/admin/reporteAprendizaje.ts`)
+devuelve un panel HTML (o JSON con `&format=json`) para auditar que el ciclo de
+aprendizaje funciona en producción: cuántos usuarios tienen negocio/tono/memoria/
+moneda, % de movimientos clasificados (vs "Sin clasificar"), cuentas creadas y
+los últimos usuarios con lo aprendido (teléfono enmascarado por privacidad).
+
+- Protegido por `ADMIN_KEY` (env). Si está vacío, el endpoint responde 404.
+- Solo lectura; aislado de `queries.ts` (consulta directa a Supabase).
+
 ## Tareas programadas (cron, zona America/Santiago)
 
 Configuradas en `src/index.ts` con `node-cron`:

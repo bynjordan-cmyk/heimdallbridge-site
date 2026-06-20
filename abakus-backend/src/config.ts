@@ -38,4 +38,7 @@ export const config = {
     // URL pública del backend (para back_url y notification_url de MP).
     publicUrl: (process.env.PUBLIC_URL ?? '').trim(),
   },
+  // Clave para el panel de administración (/admin/*). Si está vacía, el panel
+  // queda deshabilitado.
+  adminKey: (process.env.ADMIN_KEY ?? '').trim(),
 } as const;

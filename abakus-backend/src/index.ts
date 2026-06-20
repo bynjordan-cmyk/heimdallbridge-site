@@ -6,6 +6,7 @@ import { handleWebhook } from './webhook/handler';
 import { handleMercadoPagoWebhook } from './webhook/mercadopago';
 import { enviarRecordatorios } from './tasks/recordatorios';
 import { enviarTipDiario } from './tasks/tips';
+import { generarReporteAprendizaje, renderHtmlAprendizaje } from './admin/reporteAprendizaje';
 
 const app = express();
 app.use(express.json());
@@ -18,6 +19,27 @@ app.get('/health', (_req, res) => {
 // Webhook de WhatsApp Cloud API.
 app.get(config.webhookPath, verifyWebhook);
 app.post(config.webhookPath, handleWebhook);
+
+// Panel admin: salud del aprendizaje. Protegido por ADMIN_KEY (?key=...).
+app.get('/admin/aprendizaje', (req, res) => {
+  if (!config.adminKey) {
+    res.status(404).send('Not found');
+    return;
+  }
+  if (req.query.key !== config.adminKey) {
+    res.status(403).send('Forbidden');
+    return;
+  }
+  void generarReporteAprendizaje()
+    .then((reporte) => {
+      if (req.query.format === 'json') res.json(reporte);
+      else res.send(renderHtmlAprendizaje(reporte));
+    })
+    .catch((err) => {
+      console.error('[abakus][admin] Error generando reporte:', err);
+      res.status(500).send('Error generando reporte');
+    });
+});
 
 // Webhook de Mercado Pago (notificaciones de pago/suscripción).
 app.post('/webhook/mercadopago', handleMercadoPagoWebhook);
