@@ -46,6 +46,25 @@ app.get('/admin/aprendizaje', (req, res) => {
     });
 });
 
+// Disparo manual del "Sabías que..." (para probar sin esperar el cron de las 15:00).
+// Protegido por ADMIN_KEY (?key=...). Envía solo a quienes escribieron en las últimas 24h.
+app.get('/admin/enviar-tip', (req, res) => {
+  if (!config.adminKey) {
+    res.status(404).send('Not found');
+    return;
+  }
+  if (req.query.key !== config.adminKey) {
+    res.status(403).send('Forbidden');
+    return;
+  }
+  void enviarTipDiario()
+    .then((enviados) => res.json({ ok: true, enviados }))
+    .catch((err) => {
+      console.error('[abakus][admin] Error enviando tip:', err);
+      res.status(500).json({ ok: false, error: 'Error enviando tip' });
+    });
+});
+
 // Webhook de Mercado Pago (notificaciones de pago/suscripción).
 app.post('/webhook/mercadopago', handleMercadoPagoWebhook);
 

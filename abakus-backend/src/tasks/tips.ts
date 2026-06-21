@@ -1,4 +1,4 @@
-import { getUsuariosActivos } from '../supabase/queries';
+import { getUsuariosVentana24h } from '../supabase/queries';
 import { sendText } from '../whatsapp/sender';
 import { Usuario } from '../types';
 
@@ -53,12 +53,13 @@ function mensajeTip(user: Usuario, tip: string): string {
 }
 
 /**
- * Envía el "Sabías que..." del día a todos los usuarios activos.
- * Nota: es un mensaje proactivo; fuera de la ventana de 24h de WhatsApp Meta
- * puede requerir plantilla aprobada (igual que los recordatorios).
+ * Envía el "Sabías que..." del día a los usuarios que escribieron en las últimas
+ * 24h (ventana libre de WhatsApp). Así no se intenta escribir fuera de la ventana
+ * —donde Meta exigiría plantilla aprobada— y el envío llega de verdad.
+ * Devuelve cuántos se enviaron.
  */
-export async function enviarTipDiario(): Promise<void> {
-  const usuarios = await getUsuariosActivos();
+export async function enviarTipDiario(): Promise<number> {
+  const usuarios = await getUsuariosVentana24h();
   const tip = tipDelDia();
 
   let enviados = 0;
@@ -71,5 +72,6 @@ export async function enviarTipDiario(): Promise<void> {
     }
   }
 
-  console.log(`[abakus][tip] Enviados: ${enviados}/${usuarios.length} usuarios`);
+  console.log(`[abakus][tip] Enviados: ${enviados}/${usuarios.length} usuarios (ventana 24h)`);
+  return enviados;
 }

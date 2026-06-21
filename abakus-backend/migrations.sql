@@ -44,3 +44,6 @@ CREATE TABLE IF NOT EXISTS transferencias (
 );
 ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS cuenta_id uuid;
 ALTER TABLE usuarios   ADD COLUMN IF NOT EXISTS pendiente jsonb;
+
+-- 5) Ventana de 24h: hora del último mensaje entrante (tip diario / recordatorios)
+ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS ultimo_mensaje_at timestamptz;

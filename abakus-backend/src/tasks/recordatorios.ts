@@ -1,4 +1,4 @@
-import { getUsuariosActivos, getCuentasPorVencer, marcarRecordatorioEnviado } from '../supabase/queries';
+import { getUsuariosVentana24h, getCuentasPorVencer, marcarRecordatorioEnviado } from '../supabase/queries';
 import { sendText } from '../whatsapp/sender';
 import { accesoVigente } from '../flows/suscripcion';
 import { formatMonto } from '../utils/format';
@@ -15,7 +15,7 @@ function elegibleParaRecordatorio(user: Usuario): boolean {
 }
 
 export async function enviarRecordatorios(): Promise<void> {
-  const usuarios = await getUsuariosActivos();
+  const usuarios = await getUsuariosVentana24h();
   const elegibles = usuarios.filter(elegibleParaRecordatorio);
 
   let enviados = 0;

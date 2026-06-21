@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { Interpretacion, MensajeEntrante, Usuario, WhatsAppWebhookBody } from '../types';
 import { yaProcesado } from '../utils/idempotency';
-import { getUsuarioByPhone, updateUsuario, agregarAprendizaje, getUltimoMovimiento, CuentasNoDisponibleError } from '../supabase/queries';
+import { getUsuarioByPhone, updateUsuario, agregarAprendizaje, getUltimoMovimiento, touchUltimoMensaje, CuentasNoDisponibleError } from '../supabase/queries';
 import { interpretar } from '../claude/interpreter';
 import { construirPerfil } from '../aprendizaje/perfil';
 import { recordarRespuesta, ultimaRespuesta } from '../utils/contexto';
@@ -121,6 +121,10 @@ async function procesar(mensaje: MensajeEntrante): Promise<void> {
     await sendText(mensaje.phone, bienvenida);
     return;
   }
+
+  // Marca la ventana de 24h (mensajes proactivos: tip diario, recordatorios).
+  // Fire-and-forget: no debe bloquear ni romper el procesamiento del mensaje.
+  void touchUltimoMensaje(mensaje.phone);
 
   // Flujo de suscripción: email → plan → link de pago.
   if (esperandoEmail(usuario)) {
