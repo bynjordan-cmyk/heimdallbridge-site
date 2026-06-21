@@ -126,7 +126,9 @@ Modelo principal: **suscripción mensual**, cobrada vía **Mercado Pago**. ⚠�
 spec mencionaba Stripe como alternativa; **lo implementado es Mercado Pago**, CLP).
 
 Implementado hoy (`src/flows/suscripcion.ts`, `src/pagos/mercadopago.ts`):
-- Planes **Básico** y **Pro** (precios por env: Básico `4990`, Pro `9990` CLP). ✅
+- Planes **Básico** y **Pro**. Precios por variable de entorno
+  (`MERCADOPAGO_PRECIO_PLAN_BASICO` / `_PRO`; en `.env.example`: **4990 / 9990 CLP**;
+  **default `0`** en `config.ts` si no se setean en Railway). ✅
 - Flujo conversacional: `suscribirme` → pide email → elige plan → genera link de
   pago → webhook de Mercado Pago confirma y activa. ✅
 - Comando `planes` con descripción/precios (respuesta determinista, no inventada). ✅
@@ -173,6 +175,16 @@ plan free por nº de movimientos/recordatorios/consultas/clientes/exportaciones.
 - **Excel:** `exceljs` (reportes y carga masiva). ✅
 - Dependencias clave: `@anthropic-ai/sdk`, `@supabase/supabase-js`, `axios`,
   `express`, `exceljs`, `form-data`, `node-cron`, `dotenv`.
+
+**Endpoints HTTP** (`src/index.ts`):
+- `GET/POST {WEBHOOK_PATH}` (default `/webhook/abakus-whatsapp`) — verificación (GET) y
+  mensajes de WhatsApp (POST; responde 200 y procesa en background).
+- `GET /health` — `{ status, service, version, startedAt }`; `version` = commit
+  desplegado (`RAILWAY_GIT_COMMIT_SHA`), para confirmar qué quedó en producción.
+- `GET /admin/aprendizaje?key=ADMIN_KEY[&format=json]` — panel de salud del
+  aprendizaje (404 si `ADMIN_KEY` vacío, 403 si la key no coincide).
+- `POST /webhook/mercadopago` — notificaciones de pago/suscripción de Mercado Pago.
+- `GET /gracias` — página de retorno tras el pago (`back_url` de Mercado Pago).
 
 **n8n:** existe un flujo previo en n8n (Railway) que **aún corre en producción en
 paralelo**; la migración al backend propio está en curso, **sin corte final**. 🟡
@@ -427,6 +439,12 @@ desplegado.
 
 > Registrar aquí cada actualización relevante del proyecto: fecha · cambio · motivo.
 
+- **2026-06-21** — Verificación del spec contra el código real desplegado
+  (HEAD `7326124`): tipos de interpretación (12), comandos, crons (9 AM / 15:00
+  America/Santiago), modelo `claude-haiku-4-5`, default de categoría "Sin
+  clasificar" y precios (4990/9990 en `.env.example`, default 0). Se añadieron los
+  **endpoints HTTP reales** (`/health`, `/admin/aprendizaje`, `/webhook/mercadopago`,
+  `/gracias`) y se precisó que los precios vienen por variable de entorno.
 - **2026-06-21** — Creación de `ABAKUS_MASTER_SPEC.md` como fuente de verdad del
   proyecto. Motivo: preservar contexto entre sesiones de Claude Code y dejar
   explícitas las decisiones tomadas. Estado del backend al momento de crearlo
