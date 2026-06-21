@@ -1,264 +1,224 @@
 # ABAKUS MASTER SPEC
 
-> **Fuente de verdad del proyecto Abakus.** Este documento describe qué es
-> Abakus, en qué estado está, qué decisiones se tomaron y qué no debe cambiarse
-> sin autorización. Cualquier nueva conversación con Claude Code debe **leer este
-> archivo antes de modificar nada** (ver §20).
+> **Fuente de verdad del proyecto Abakus.** Describe qué es, **qué hace hoy**, su
+> arquitectura real, las decisiones tomadas y lo que no debe cambiarse sin
+> autorización. Toda nueva conversación de Claude Code debe **leer este archivo
+> antes de modificar nada** (ver §20).
 >
-> **Última actualización:** 2026-06-21 · **Rama de desarrollo:** `claude/remote-control-yexmni`
+> **Última actualización:** 2026-06-21 · **Rama:** `claude/remote-control-yexmni`
+> · **Versión desplegada:** consultar `GET /health` (devuelve el commit).
 >
-> **Leyenda de estado:** ✅ Implementado · 🟡 Parcial · ⛔ Pendiente · ⚠️ Difiere de lo que dice el spec idealizado.
+> Leyenda: ✅ funcionando · 🟡 parcial · ⛔ pendiente.
 
 ---
 
 ## 1. Resumen ejecutivo del producto
 
-Abakus es un **asistente financiero conversacional que funciona principalmente por
-WhatsApp**. Está pensado para freelancers, emprendedores, trabajadores
-independientes, pequeños negocios y personas que necesitan ordenar ingresos,
-gastos, cuentas por cobrar y cuentas por pagar **sin usar Excel ni instalar una
-app compleja**.
+Abakus es un **asistente financiero conversacional por WhatsApp** para
+freelancers, emprendedores, trabajadores independientes y pequeños negocios que
+necesitan ordenar **ingresos, gastos, cuentas por cobrar, cuentas por pagar y
+saldos** sin Excel ni una app.
 
-Promesa central: **"Tu plata bajo control desde WhatsApp."**
-(La landing usa la variante: *"Tu plata bajo control, sin Excel y sin apps"*.)
+Promesa: **"Tu plata bajo control desde WhatsApp."** (Landing: *"Tu plata bajo
+control, sin Excel y sin apps"*.)
 
-Abakus **no** es un ERP, **no** es un sistema contable completo y **no** reemplaza
-al contador. Es un asistente simple para **registrar, ordenar, consultar y
-recordar** movimientos financieros cotidianos.
-
----
-
-## 2. Visión del ecosistema Heimdall Assistants
-
-Abakus es parte de un ecosistema mayor de asistentes (marca paraguas: **Heimdall
-Bridge / Heimdall Assistants**):
-
-- **Quanta** — asistente **previo a la venta**: cotizador, responde preguntas
-  comerciales, genera cotizaciones.
-- **Factum** — asistente **operativo / facturación**: facturación, compras,
-  clientes y procesos posteriores a la venta.
-- **Abakus** — asistente **financiero posterior a la operación**: ingresos,
-  egresos, cuentas por cobrar/pagar, resúmenes y orden financiero.
-
-Concepto: **Quanta antes** de la venta · **Factum durante** la operación/facturación
-· **Abakus después** (control financiero).
-
-> Estado: los tres son **productos separados**. Hoy en este repositorio **solo
-> existe Abakus** (landing + backend). Quanta y Factum son visión, no código aquí. ⛔
+El usuario escribe en lenguaje natural (*"vendí 80 mil en diseño"*, *"pagué 15 mil
+de internet"*, *"Carlos me debe 50 mil"*) y Abakus lo interpreta con IA, lo
+registra en su base y responde de forma cálida y breve. **No** es ERP, **no** es
+contabilidad completa, **no** reemplaza al contador.
 
 ---
 
-## 3. Usuario ideal
+## 2. Funcionalidades actuales (el corazón del documento)
 
-**Cliente objetivo:** freelancers, emprendedoras, dueños de pequeños negocios,
-personas que venden por WhatsApp o redes, PYMEs pequeñas sin área financiera,
-gente que no usa Excel de forma constante y quiere registrar rápido desde el
-celular.
+Todo esto **ya está implementado** en el backend (rama `claude/remote-control-yexmni`):
 
-**Dolores principales:** no saben cuánto ganaron realmente; mezclan dinero
-personal y del negocio; olvidan cobrar; no registran gastos pequeños; no tienen
-claridad mensual; usan memoria/notas/Excel incompleto/libretas; el contador
-recibe información incompleta o tarde.
+**Registro en lenguaje natural** ✅
+- Ingresos y egresos, **uno o varios en un mismo mensaje** ("vendí 50 mil el
+  lunes, pagué 20 mil de arriendo y gasté 8 mil en bencina" → 3 movimientos).
+- Resuelve fechas relativas ("ayer", "el lunes", "el 3 de mayo").
+- Maneja coloquialismos ("3 lucas" = 3000; "3000 mil" = 3000, no 3.000.000).
+- Si la dirección es ambigua ("pago de 20000"), **pregunta** si fue ingreso o egreso.
+- Si no puede inferir categoría, registra como **"Sin clasificar"** y sugiere
+  especificar (no bloquea el registro).
 
----
+**Cuentas por cobrar y por pagar** ✅
+- CxC: *"Carlos me debe 50000 hasta el viernes"*; cobro: *"Juan me pagó"*.
+- CxP: *"le debo 20000 a Ana"*, *"tengo que pagar el arriendo el 5"*; saldar:
+  *"ya le pagué a Ana"*.
+- Cobrar/saldar **solo marca la cuenta como pagada**, no genera un movimiento.
 
-## 4. Propuesta de valor
+**Bancos / caja, saldos y transferencias** ✅
+- Crear cuenta: *"tengo Banco Estado con 100000"*, *"agrega caja con 5000"*.
+- Asignar movimientos a una cuenta ("mencionar siempre": si el usuario ya tiene
+  cuentas, debe indicar a cuál va; si no, Abakus **pregunta**).
+- Transferencias: *"transferí 50000 de Banco Estado a Caja"*.
+- Saldo por cuenta = saldo inicial + ingresos − egresos + transferencias.
 
-Abakus ayuda a: registrar ingresos, gastos, cobros pendientes y pagos pendientes;
-crear/identificar clientes y proveedores; consultar saldos; ver resúmenes
-diarios/semanales/mensuales; recordar vencimientos; dar claridad financiera sin
-lenguaje técnico; y exportar cuando sea necesario.
+**Correcciones y borrado** ✅
+- Corregir el último movimiento o uno por número: *"corrige el #5 a 2000"*,
+  *"era un ingreso no egreso"*, *"el #1 fue en Banco de Chile"*. Cambia monto,
+  tipo, categoría, descripción y/o cuenta.
+- *"deshacer"* / *"borra el último"* elimina el último movimiento.
 
-**Tono del producto:** simple, cercano, humano, útil, cero intimidante. Evitar
-jerga contable innecesaria.
+**Consultas y reportes** ✅
+- `resumen` (mes) / `resumen mayo`: ingresos, egresos, balance, **proyección de
+  cierre**, desglose por categoría y meta.
+- `detalle` (lista de movimientos **en el chat**, alternativa al Excel).
+- `reporte` / `reporte mayo`: **Excel** (hojas: Resumen, Movimientos con #, Cuentas).
+- `comparar`: este mes vs. el anterior con tendencias.
+- `proyección [mes]`: estimado futuro según historial.
+- `meta [monto]`: objetivo mensual de ingresos con barra de progreso.
+- `cuentas` / `saldos`: saldo de cada banco/caja + total.
+- `cobros` (lo que te deben) · `por pagar` (lo que debes).
 
----
+**Carga masiva por Excel** ✅
+- `plantilla` envía un `.xlsx` modelo; el usuario lo completa y lo reenvía;
+  Abakus lo parsea e inserta en lote (tolerante a filas con errores).
 
-## 5. Alcance del V1
+**Aprendizaje por usuario** ✅
+- Aprende y reutiliza: **negocio**, **tono**, **categorías frecuentes**,
+  **contrapartes**, y **memoria** (datos durables tipo "trabajo con boleta de
+  honorarios"). Se inyecta en el prompt para personalizar interpretación y respuesta.
 
-1. Registro de ingresos. ✅
-2. Registro de egresos. ✅
-3. Registro de cuentas por cobrar. ✅
-4. Registro de cuentas por pagar. ✅
-5. Clientes. 🟡 (hoy se modelan como texto `contraparte`, no como entidad formal — ver §12)
-6. Proveedores. 🟡 (igual que clientes: `contraparte`)
-7. Recordatorios internos al usuario. ✅ (cron diario 9 AM)
-8. Resumen básico por WhatsApp. ✅ (`resumen`, `detalle`, `reporte`)
-9. Consulta de estado: ¿cuánto vendí? ✅ · ¿cuánto gasté? ✅ · ¿quién me debe? ✅ (`cobros`) · ¿a quién debo? ✅ (`por pagar`) · ¿cómo voy este mes? ✅ (`resumen`, `comparar`)
+**Multimoneda** ✅
+- Una moneda por usuario (ISO 4217), inferida por prefijo telefónico y cambiable
+  ("uso dólares"). Formatea montos según la moneda.
 
-> Extras ya implementados que van más allá del V1 mínimo: **multimoneda**,
-> **cuentas (bancos/caja) con saldos iniciales y transferencias**, **carga masiva
-> por Excel**, **proyecciones**, **metas mensuales**, **tip financiero diario** y
-> **aprendizaje por usuario**.
+**Onboarding guiado** ✅
+- Usuario nuevo: bienvenida → *"¿a qué te dedicas?"* (captura negocio) →
+  invitación al primer registro (incluye carga inicial multi-movimiento, cuentas
+  y moneda). Se puede *saltar*.
 
----
+**Automatización (cron, zona America/Santiago)** ✅
+- **09:00** — recordatorios de cobros **y** pagos por vencer (solo al usuario).
+- **15:00** — "Sabías que..." tip financiero diario (rota por día).
 
-## 6. Fuera del alcance del V1
+**Suscripción** ✅/🟡
+- Planes **Básico** y **Pro** vía **Mercado Pago** (flujo `suscribirme` → email →
+  plan → link → webhook activa). `planes` muestra precios reales.
 
-No incluir todavía: facturación electrónica; emisión de boletas; declaraciones
-tributarias; integración bancaria; contabilidad completa; nómina; inventario; app
-móvil nativa; dashboard avanzado; IA financiera compleja; envío automático de
-mensajes a clientes del usuario; cobranza automática a terceros.
-
-> **Regla dura:** Abakus puede **recordar al usuario** que debe cobrar, pero en V1
-> **no escribe automáticamente al cliente final** sin aprobación expresa. Hoy el
-> cron de recordatorios **solo le escribe al propio usuario**. ✅
-
----
-
-## 7. Canales principales
-
-- **Canal principal:** WhatsApp (Cloud API de Meta). ✅
-- **Canales secundarios:** Landing page, Instagram, TikTok, email/WhatsApp para
-  waitlist/beta.
-
-Embudo ideal: contenido en redes → landing → waitlist → acceso beta →
-interacción por WhatsApp → conversión a plan pago.
-
-> Estado: la **landing existe** (`abakus/index.html`), pero la **captura de leads
-> / waitlist conectada a una base no está verificada en el repo**. ⛔
-
----
-
-## 8. Modelo de monetización
-
-Modelo principal: **suscripción mensual**, cobrada vía **Mercado Pago**. ⚠️ (el
-spec mencionaba Stripe como alternativa; **lo implementado es Mercado Pago**, CLP).
-
-Implementado hoy (`src/flows/suscripcion.ts`, `src/pagos/mercadopago.ts`):
-- Planes **Básico** y **Pro** (precios por env: Básico `4990`, Pro `9990` CLP). ✅
-- Flujo conversacional: `suscribirme` → pide email → elige plan → genera link de
-  pago → webhook de Mercado Pago confirma y activa. ✅
-- Comando `planes` con descripción/precios (respuesta determinista, no inventada). ✅
-- Límite Plan Básico: hasta 3 cuentas por cobrar/pagar activas. ✅
-- **Trial:** existe el campo `trial_ends_at` y la lógica `accesoVigente`; usuarios
-  sin ese campo (pre-migración) **no se bloquean**. 🟡 (el trial de 15 días del
-  spec no está garantizado para todos los nuevos usuarios; revisar al definir
-  pricing final).
-
-Idea a cuidar (pendiente de decisión): no regalar demasiado en gratis; limitar
-plan free por nº de movimientos/recordatorios/consultas/clientes/exportaciones. ⛔
+**Operación / admin** ✅
+- `GET /health` → estado + commit desplegado.
+- `GET /admin/aprendizaje?key=ADMIN_KEY` → panel de auditoría del aprendizaje.
 
 ---
 
-## 9. Landing y marca
+## 3. Comandos y disparadores reales
 
-- **Dominio:** heimdallbridge.com/abakus (en el repo: `abakus/index.html`). ✅
-- **Instagram/TikTok sugerido:** `@heyabakus`.
-- **Nombre:** Abakus (con K).
-- **Concepto visual:** ábaco moderno, amigable, colorido.
-- **Promesa landing:** *"Tu plata bajo control, sin Excel y sin apps"*.
-- La landing debe captar leads (idealmente WhatsApp, nombre, país; email
-  secundario). 🟡 (UI presente; backend de captura por verificar).
+| Comando / frase | Acción |
+|---|---|
+| lenguaje natural (ingreso/egreso/deuda/etc.) | registra/corrige según interpretación de IA |
+| `resumen`, `saldo`, `resumen mayo` | balance del mes/mes indicado |
+| `detalle`, "muéstrame en el chat", "sin excel" | lista de movimientos en texto |
+| `reporte`, `informe`, `reporte mayo` | Excel |
+| `comparar`, `mes pasado` | mes actual vs. anterior |
+| `proyección [mes]` | estimado futuro |
+| `meta [monto]`, `objetivo` | fija/consulta meta mensual |
+| `cuentas`, `saldos`, `bancos`, `cuánto tengo` | saldos por cuenta |
+| `cobros`, `me deben`, `por cobrar` | cuentas por cobrar |
+| `por pagar`, `mis deudas`, `qué debo` | cuentas por pagar |
+| `plantilla`, `formato` | Excel modelo para carga masiva |
+| `planes`, `precio`, `cuánto cuesta` | descripción de planes |
+| `pagar`, `suscribirme`, `activar plan` | inicia suscripción |
+| `deshacer`, `borra el último` | elimina último movimiento |
+| `ayuda`, `menú` | menú de capacidades |
 
-> El repo es un **monorepo del sitio Heimdall**: `index.html` (sitio "Heimdall
-> Bridge Consulting"), `abakus/index.html` (landing de Abakus) y `abakus-backend/`
-> (el backend del asistente).
+**Tipos que interpreta la IA** (`claude/interpreter.ts`): `ingreso`, `egreso`,
+`deuda` (CxC), `cobro`, `cuenta_pagar` (CxP), `saldar`, `corregir`, `eliminar`,
+`crear_cuenta`, `transferencia`, `consulta`, `desconocido`.
 
 ---
 
-## 10. Stack técnico (estado real del repositorio)
+## 4. Usuario ideal y dolores
 
-**Backend** (`abakus-backend/`):
-- **Node.js ≥ 22 + TypeScript**, servidor **Express**. ✅
-- **WhatsApp Cloud API (Meta)** — Graph API v22.0. ✅
-- **IA: Anthropic Claude** modelo `claude-haiku-4-5`. ⚠️ (el spec mencionaba
-  OpenAI/Claude; **lo implementado es Claude**, no OpenAI).
-- **Base de datos: Supabase (PostgreSQL)** — proyecto `iszuxcphtatbxmrzoeyk`. ✅
-- **Pagos: Mercado Pago**. ⚠️ (no Stripe).
-- **Deploy: Railway** (root directory `abakus-backend/`, build `npm run build`,
-  start `npm start`). ✅
-- **Cron:** `node-cron` (recordatorios 9 AM, tip diario 15:00, zona
-  America/Santiago). ✅
-- **Excel:** `exceljs` (reportes y carga masiva). ✅
-- Dependencias clave: `@anthropic-ai/sdk`, `@supabase/supabase-js`, `axios`,
-  `express`, `exceljs`, `form-data`, `node-cron`, `dotenv`.
+**Cliente:** freelancers, emprendedoras, dueños de pequeños negocios, quienes
+venden por WhatsApp/redes, PYMEs sin área financiera, gente que no usa Excel
+constante y quiere registrar rápido desde el celular.
 
-**n8n:** existe un flujo previo en n8n (Railway) que **aún corre en producción en
-paralelo**; la migración al backend propio está en curso, **sin corte final**. 🟡
+**Dolores:** no saben cuánto ganaron; mezclan dinero personal y del negocio;
+olvidan cobrar; no registran gastos chicos; no tienen claridad mensual; el
+contador recibe info incompleta o tarde.
 
-**Landing:** HTML estático en el repo. Hosting/Vercel no confirmado desde el
-código. 🟡
+---
 
-**Variables de entorno** (ver `abakus-backend/.env.example`): credenciales de
-WhatsApp, `ANTHROPIC_API_KEY`/`ANTHROPIC_MODEL`, `SUPABASE_URL`/`SUPABASE_SERVICE_KEY`,
-config de Mercado Pago, `PUBLIC_URL`, `PORT`, `WEBHOOK_PATH`, `ADMIN_KEY`.
-**Los secretos nunca se commitean.**
+## 5. Ecosistema Heimdall Assistants
 
-**Estructura de `abakus-backend/src/`:**
+Marca paraguas: **Heimdall Bridge / Heimdall Assistants**. Tres productos
+**separados**: **Quanta** (antes de la venta: cotizador), **Factum** (durante:
+facturación/operación) y **Abakus** (después: control financiero).
+
+> En este repositorio **solo existe Abakus** (landing + backend). Quanta y Factum
+> son visión, no hay código aquí. ⛔
+
+---
+
+## 6. Stack técnico real
+
+- **Backend** `abakus-backend/`: **Node ≥22 + TypeScript**, **Express**. ✅
+- **WhatsApp:** **Cloud API de Meta** (Graph v22.0). ✅
+- **IA:** **Anthropic Claude `claude-haiku-4-5`** con structured outputs (JSON Schema). ✅
+- **Base de datos:** **Supabase (PostgreSQL)**, proyecto `iszuxcphtatbxmrzoeyk`. ✅
+- **Pagos:** **Mercado Pago** (CLP). ✅
+- **Deploy:** **Railway** (root `abakus-backend/`, build `npm run build`, start `npm start`). ✅
+- **Cron:** `node-cron`. **Excel:** `exceljs`. **HTTP:** `axios`. ✅
+- Dependencias: `@anthropic-ai/sdk`, `@supabase/supabase-js`, `axios`, `express`,
+  `exceljs`, `form-data`, `node-cron`, `dotenv`.
+
+**Variables de entorno** (`.env.example`): credenciales WhatsApp/Meta,
+`ANTHROPIC_API_KEY` + `ANTHROPIC_MODEL`, `SUPABASE_URL` + `SUPABASE_SERVICE_KEY`,
+config Mercado Pago, `PUBLIC_URL`, `PORT`, `WEBHOOK_PATH`, `ADMIN_KEY`. Los
+secretos **no se commitean**.
+
+**n8n:** flujo previo en n8n/Railway **aún en producción en paralelo**; migración
+al backend propio en curso, **sin corte final**. 🟡
+
+---
+
+## 7. Estructura del repositorio (monorepo)
+
 ```
-admin/reporteAprendizaje.ts   Panel /admin/aprendizaje (auditoría de aprendizaje)
-aprendizaje/perfil.ts         Perfil del usuario inyectado a Claude
-claude/interpreter.ts         Interpretación NL → JSON estructurado (Claude)
-config.ts                     Carga/valida variables de entorno
-flows/onboarding.ts           Onboarding guiado de usuarios nuevos
-flows/registro.ts             Ingresos/egresos, corregir, eliminar, cobro, saldar, CxC/CxP
-flows/consulta.ts             Comandos (resumen, detalle, cobros, por pagar, cuentas, etc.)
-flows/cuentas.ts              Bancos/caja, saldos, transferencias, pedir cuenta
-flows/carga.ts                Carga masiva por Excel + plantilla
-flows/reporte.ts              Reporte Excel
-flows/suscripcion.ts          Planes, trial, Mercado Pago
-pagos/mercadopago.ts          Integración Mercado Pago
-reports/excel.ts              Generación de Excel (reporte + plantilla)
-reports/importExcel.ts        Parser de Excel para carga masiva
-reports/periodo.ts            Parseo de períodos ("mayo", "este mes", etc.)
-supabase/client.ts            Cliente Supabase
-supabase/queries.ts           Acceso a datos (usuarios, movimientos, cuentas, etc.)
-tasks/recordatorios.ts        Cron 9 AM: avisos de cobros/pagos por vencer
-tasks/tips.ts                 Cron 15:00: "Sabías que..." financiero
-scripts/wa-perfil.ts          Script utilitario de perfil de WhatsApp
-utils/format.ts               Formato de moneda (multimoneda)
-utils/idempotency.ts          Dedup de message_id (en memoria)
-utils/contexto.ts             Contexto conversacional reciente (en memoria)
-webhook/handler.ts            Orquestador principal del webhook de WhatsApp
-webhook/verify.ts             Verificación GET de Meta
-webhook/mercadopago.ts        Webhook de pagos de Mercado Pago
-whatsapp/sender.ts            Envío de texto/documentos + descarga de media
-types.ts                      Tipos del dominio y de interpretación
+/ (heimdallbridge-site)
+├── index.html                 Sitio "Heimdall Bridge Consulting"
+├── abakus/index.html          Landing de Abakus ("Tu plata bajo control...")
+├── ABAKUS_MASTER_SPEC.md      Este documento
+└── abakus-backend/            Backend del asistente (Node/TS)
+    ├── CLAUDE.md              Documentación técnica detallada
+    ├── migrations.sql         Esquema/migraciones de Supabase
+    ├── .env.example           Plantilla de variables de entorno
+    └── src/
+        ├── index.ts                  Server Express, rutas, crons
+        ├── config.ts                 Carga/valida env
+        ├── types.ts                  Tipos de dominio e interpretación
+        ├── webhook/                  handler (orquestador), verify, mercadopago
+        ├── claude/interpreter.ts     NL → JSON estructurado (Claude)
+        ├── flows/                    onboarding, registro, consulta, cuentas,
+        │                             carga, reporte, suscripcion
+        ├── aprendizaje/perfil.ts     Perfil del usuario para el prompt
+        ├── supabase/                 client, queries
+        ├── reports/                  excel, importExcel, periodo
+        ├── pagos/mercadopago.ts      Integración pagos
+        ├── tasks/                    recordatorios (9:00), tips (15:00)
+        ├── admin/reporteAprendizaje  Panel /admin/aprendizaje
+        ├── whatsapp/sender.ts        Envío texto/documentos + descarga media
+        ├── utils/                    format (moneda), idempotency, contexto
+        └── scripts/wa-perfil.ts      Utilidad de perfil de WhatsApp
 ```
-Documentación de desarrollo más detallada: `abakus-backend/CLAUDE.md`.
-Migraciones SQL: `abakus-backend/migrations.sql`.
 
 ---
 
-## 11. Arquitectura funcional (flujo del V1)
+## 8. Modelo de datos real (Supabase)
 
-Flujo por mensaje (`webhook/handler.ts`):
-1. Meta envía el webhook → se responde **200 inmediatamente** (< 5 s) y se procesa
-   en background.
-2. Se busca el usuario por teléfono (normalizado a **E.164 con `+`**, igual que n8n).
-3. Estados conversacionales prioritarios: suscripción (email/plan), **esperando
-   cuenta** (a qué banco/caja va un movimiento), onboarding.
-4. **Comandos** especiales (no pasan por Claude): `resumen`, `detalle`, `cobros`,
-   `por pagar`, `cuentas`, `reporte`, `plantilla`, `planes`, `pago`, `eliminar`,
-   `comparar`, `meta`, `proyección`, `ayuda`.
-5. Si no es comando → **Claude interpreta** el mensaje con contexto (perfil
-   aprendido, último movimiento, conversación reciente, cuentas, moneda).
-6. Se persiste el aprendizaje y se ejecuta la acción (registrar, corregir,
-   transferir, etc.).
-7. Se responde de forma **amigable** (nunca JSON al usuario).
-
-Ejemplos de comportamiento esperado:
-- *"Vendí 80.000 hoy"* → registra ingreso, confirma con saldo del mes.
-- *"Pedro me debe 120.000"* → cuenta por cobrar para Pedro (pregunta vencimiento si falta).
-- *"Pagué 35.000 de internet"* → egreso, categoría "Internet"/"Servicios básicos".
-- *"Me pagaron 1.300.000"* → ingreso; si no dice de qué, queda **"Sin clasificar"**
-  y sugiere especificar; la respuesta de seguimiento ("mi salario") lo clasifica.
-
----
-
-## 12. Datos — modelo real implementado vs. spec
-
-**Tablas reales en Supabase** (ver `migrations.sql` y `types.ts`):
+Ver `abakus-backend/migrations.sql` y `types.ts`.
 
 - **`usuarios`** — `id`, `phone` (E.164 con `+`), `nombre`, `plan`, `activo`,
-  `negocio`, `tono`, `moneda` (ISO 4217), `onboarding_step`, `trial_ends_at`,
-  `email`, `estado_conversacion`, `meta_mensual`, `memoria` (jsonb),
-  `pendiente` (jsonb), `created_at`.
+  `negocio`, `tono`, `moneda`, `onboarding_step`, `trial_ends_at`, `email`,
+  `estado_conversacion`, `meta_mensual`, `memoria` (jsonb), `pendiente` (jsonb),
+  `created_at`.
 - **`movimientos`** — `id`, `user_phone`, `correlativo` (#N por usuario), `tipo`
-  (`ingreso`|`egreso`), `monto`, `categoria`, `descripcion`, `fecha`,
-  `cuenta_id`, `raw_message`, `created_at`.
-- **`cuentas_pendientes`** — CxC **y** CxP unificadas por campo `tipo`
+  (`ingreso`|`egreso`), `monto`, `categoria`, `descripcion`, `fecha`, `cuenta_id`,
+  `raw_message`, `created_at`.
+- **`cuentas_pendientes`** — CxC **y** CxP unificadas por `tipo`
   (`por_cobrar`|`por_pagar`): `id`, `user_phone`, `tipo`, `contraparte`, `monto`,
   `descripcion`, `fecha_vencimiento`, `pagado`, `recordatorio_enviado`, `created_at`.
 - **`cuentas`** — bancos/caja: `id`, `user_phone`, `nombre`, `tipo`
@@ -266,173 +226,201 @@ Ejemplos de comportamiento esperado:
 - **`transferencias`** — `id`, `user_phone`, `cuenta_origen`, `cuenta_destino`,
   `monto`, `fecha`, `created_at`.
 
-⚠️ **Diferencias con el modelo idealizado del spec:**
-- **No existen tablas `clientes` ni `proveedores`** como entidades formales. Hoy el
-  "cliente/proveedor" es el texto `contraparte` en `cuentas_pendientes`. Si se
-  quiere CRM real, es trabajo nuevo.
-- **No existe tabla `mensaje`** (historial de mensajes/interpretaciones). La
-  idempotencia y el contexto conversacional son **en memoria** (no persisten a
-  reinicios ni a múltiples instancias).
-- Estados de CxC/CxP hoy son **booleano `pagado`**, no el enum
-  `pendiente/pagada/vencida/parcial`. No hay **pagos parciales**.
-- El movimiento no guarda `moneda` por fila; la moneda es **una por usuario**
-  (`usuarios.moneda`).
+**Notas de diseño actuales:**
+- "Cliente/proveedor" hoy es el texto `contraparte` en `cuentas_pendientes`. **No
+  hay tablas `clientes`/`proveedores`** separadas.
+- Estado de CxC/CxP es booleano `pagado` (no `vencida`/`parcial`; **sin pagos
+  parciales**).
+- **Una moneda por usuario** (no por movimiento).
+- **No hay tabla de mensajes/historial**: la idempotencia (`utils/idempotency.ts`)
+  y el contexto conversacional (`utils/contexto.ts`) son **en memoria** → se
+  pierden en reinicios/multi-instancia.
 
 ---
 
-## 13. Reglas de negocio (estado)
+## 9. Flujo de procesamiento (webhook/handler.ts)
 
-- La moneda se infiere por prefijo telefónico y el usuario puede cambiarla. ✅
-- Si falta info crítica, Abakus pregunta de forma simple. 🟡 (mejorando; el
-  contexto conversacional para seguimientos es **en memoria**, frágil).
-- Si el mensaje es ambiguo (p. ej. dirección ingreso/egreso poco clara), **no
-  inventar**: preguntar. ✅
-- Si detecta un cliente/proveedor o **cuenta** nueva, puede crearla al vuelo. ✅
-  (cuentas bancarias; clientes/proveedores como `contraparte`).
-- CxC/CxP con vencimiento **opcional** pero recomendable. ✅
-- Los recordatorios avisan **al usuario**, no al tercero. ✅
+1. Meta envía el webhook → responder **200 en < 5 s** y procesar en background.
+2. Idempotencia por `message_id` (en memoria).
+3. Buscar usuario por teléfono (**E.164 con `+`**, igual que n8n).
+4. Estados prioritarios: suscripción (email/plan), **esperando cuenta**, onboarding.
+5. **Comandos** (no pasan por IA, ver §3).
+6. Si no es comando → **Claude interpreta** con contexto: perfil aprendido,
+   último movimiento, conversación reciente, cuentas y moneda.
+7. Persistir aprendizaje (negocio/tono/memoria) y ejecutar la acción.
+8. Responder **amigable** (nunca JSON al usuario).
+
+---
+
+## 10. IA y personalidad
+
+- **Modelo:** Claude `claude-haiku-4-5`, structured outputs (JSON Schema). El JSON
+  es interno; una capa lo convierte en respuesta amigable.
+- **Personalidad:** claro, cercano, útil, breve, cero regañón, motivador sin
+  exagerar. No saluda en cada mensaje (asume conversación en curso); responde
+  presente si lo llaman por su nombre. Evita jerga contable.
+- **Reglas clave del prompt:** no inventar datos; preguntar si falta algo crítico
+  o si hay ambigüedad de dirección; reutilizar categorías existentes del usuario;
+  nunca prometer sitios/apps externas; nunca decir que es "gratis" ni inventar
+  precios (derivar a `planes`/`suscribirme`).
+
+---
+
+## 11. Monetización (estado real)
+
+- **Suscripción mensual** vía **Mercado Pago**. Planes por env: Básico `4990`,
+  Pro `9990` CLP.
+- Flujo `suscribirme` → email → plan → link de pago → webhook activa. ✅
+- Límite Plan Básico: hasta 3 cuentas por cobrar/pagar activas. ✅
+- **Trial:** existe `trial_ends_at` + `accesoVigente`; usuarios sin ese campo
+  **no se bloquean** (compatibilidad con n8n). El trial de N días **no está
+  garantizado para todos los nuevos usuarios** → decisión pendiente. 🟡
+- Definir límites del plan gratis (movimientos/recordatorios/consultas/exportes). ⛔
+
+---
+
+## 12. Landing, marca y canales
+
+- **Dominio:** heimdallbridge.com/abakus (`abakus/index.html`). ✅
+- **Marca:** Abakus (con K). **Redes:** `@heyabakus`. Concepto visual: ábaco
+  moderno, amigable.
+- **Canal principal:** WhatsApp. **Secundarios:** landing, Instagram, TikTok,
+  waitlist/beta.
+- **Embudo:** redes → landing → waitlist → beta → WhatsApp → plan pago.
+- **Captura de leads / waitlist:** UI en la landing, pero **no se ve conectada a
+  una base** en el repo. ⛔
+
+---
+
+## 13. Reglas de negocio vigentes
+
+- Moneda inferida por país/prefijo; el usuario puede cambiarla. ✅
+- Ante falta de info crítica o ambigüedad → preguntar, no inventar. ✅
+- Cliente/proveedor o cuenta nueva → se puede crear al vuelo. ✅
+- CxC/CxP con vencimiento opcional (recomendable). ✅
+- Recordatorios avisan **al usuario**, nunca al tercero. ✅
+- El usuario puede **corregir** (monto, tipo, categoría, descripción, cuenta) y
+  **eliminar**. ✅
+- "Sin clasificar" como categoría por defecto; nunca bloquear el registro. ✅
+- "Mencionar siempre" la cuenta cuando el usuario ya tiene cuentas (una por mensaje). ✅
 - Datos privados por usuario. ✅
-- El usuario puede **corregir** movimientos (monto, tipo, categoría, descripción,
-  cuenta) y **eliminar**. ✅
-- Decisión de clasificación: si no se puede inferir categoría, se usa
-  **"Sin clasificar"** (no se bloquea el registro). ✅
 
 ---
 
-## 14. IA y procesamiento de lenguaje natural
+## 14. Fuera del alcance actual
 
-- Modelo: **Claude `claude-haiku-4-5`** (Anthropic), con **structured outputs**
-  (JSON Schema). ✅
-- Clasifica `tipo`: `ingreso`, `egreso`, `deuda` (CxC), `cobro`, `cuenta_pagar`
-  (CxP), `saldar`, `corregir`, `eliminar`, `crear_cuenta`, `transferencia`,
-  `consulta`, `desconocido`. ✅
-- Extrae: monto, moneda, fecha (resuelve "ayer", "el lunes"...), contraparte,
-  descripción, **categoría sugerida** (reutilizando las del usuario), cuenta, y
-  campos de aprendizaje (negocio/tono/aprendizaje). ✅
-- Soporta **varios movimientos en un mismo mensaje** (`movimientos[]`). ✅
-- La IA devuelve **JSON interno**; una capa lo convierte en respuesta amigable.
-  **Nunca se responde JSON al usuario.** ✅
+Hoy Abakus **no hace** (y no debe prometer): facturación/boletas electrónicas,
+declaraciones tributarias, integración bancaria, contabilidad completa, nómina,
+inventario, app nativa, dashboard web, cobranza automática a terceros, ni
+escribir automáticamente al cliente final del usuario. (Puede **recordarle al
+usuario** que cobre, pero no contacta al tercero.)
 
 ---
 
-## 15. Personalidad de Abakus
+## 15. Roadmap
 
-Claro, cercano, útil, breve, cero regañón, motivador sin exagerar. Ejemplos de
-tono: *"Listo, lo anoté."*, *"Te dejo esto registrado."*, *"Ese cobro queda
-pendiente."*, *"Te puedo recordar si quieres."*, *"Este mes vas en..."*. Evitar
-tono corporativo. (Reflejado en el system prompt de `claude/interpreter.ts` y en
-los textos de los flujos.) ✅
+**Fase 1 (base) — mayormente lista:** WhatsApp ✅ · registro ✅ · CxC/CxP ✅ ·
+resumen ✅ · landing 🟡 · waitlist ⛔.
 
----
+**Fase 2:** recordatorios ✅ · exportación (Excel ✅, PDF ⛔) · trial/pagos 🟡 ·
+mejora de prompts ✅ (continuo) · historial conversacional persistente 🟡 (hoy en memoria).
 
-## 16. Roadmap
+**Fase 3:** dashboard web ⛔ · categorías personalizadas 🟡 (aprende) · multimoneda
+✅ · reportes ✅ · Stripe ⛔ (hoy Mercado Pago).
 
-**Fase 1 (base):** Landing 🟡 · Waitlist ⛔ · WhatsApp conectado ✅ · Registro
-básico ✅ · Clientes/proveedores básicos 🟡 · CxC/CxP básica ✅ · Resumen mensual ✅.
-
-**Fase 2:** Recordatorios automáticos ✅ · Exportación PDF/Excel 🟡 (Excel sí, PDF
-no) · Trial y pagos ✅/🟡 · Mejora de prompts ✅ (continuo) · Historial
-conversacional 🟡 (en memoria).
-
-**Fase 3:** Dashboard web ligero ⛔ · Categorías personalizadas 🟡 (aprende del
-usuario) · Multimoneda ✅ · Reportes ✅ (Excel) · Integración con Stripe ⛔ (hoy
-Mercado Pago).
-
-**Fase 4:** Quanta y Factum conectados ⛔ · Integraciones contables ⛔ · Planes
-B2B ⛔.
+**Fase 4:** Quanta y Factum conectados ⛔ · integraciones contables ⛔ · B2B ⛔.
 
 ---
 
-## 17. Decisiones tomadas (no cambiar sin autorización)
+## 16. Decisiones tomadas (no cambiar sin autorización)
 
-- Abakus **no será app nativa** al inicio; vive **principalmente en WhatsApp**.
-- **No prometer facturación electrónica** ni integración bancaria en V1.
-- **No mezclar Abakus con HBC App.**
-- **Abakus, Quanta y Factum son productos separados**; se promocionan desde
-  Heimdall Bridge / Heimdall Assistants.
+- Abakus vive **principalmente en WhatsApp**; **no** app nativa al inicio.
+- **No** prometer facturación electrónica ni integración bancaria en V1.
+- **No** mezclar Abakus con HBC App. Abakus, Quanta y Factum son **separados**.
 - **IA = Claude `claude-haiku-4-5`** (no OpenAI).
-- **Pagos = Mercado Pago** (no Stripe en esta etapa; Stripe quedaría para global).
-- **Base de datos = Supabase** (proyecto `iszuxcphtatbxmrzoeyk`).
-- **Teléfono se normaliza a E.164 con `+`** para calzar con el historial de n8n.
-- **CxC y CxP comparten la tabla `cuentas_pendientes`** diferenciadas por `tipo`.
-- **Cobrar/saldar solo marca la cuenta como pagada; NO genera un movimiento** de
-  ingreso/egreso (consistente entre CxC y CxP).
-- **"Sin clasificar"** es la categoría por defecto cuando no se puede inferir (no
-  "Otros"); nunca se bloquea el registro por falta de categoría.
-- **Mencionar siempre la cuenta**: si el usuario ya tiene cuentas creadas, cada
-  movimiento debe indicar cuenta; si no, Abakus pregunta (una cuenta por mensaje).
+- **Pagos = Mercado Pago** (Stripe quedaría para global, no ahora).
+- **DB = Supabase** (proyecto `iszuxcphtatbxmrzoeyk`).
+- **Teléfono en E.164 con `+`** para calzar con n8n.
+- **CxC y CxP comparten `cuentas_pendientes`** (campo `tipo`).
+- **Cobrar/saldar solo marca pagado; NO crea movimiento.**
+- **"Sin clasificar"** por defecto; nunca bloquear el registro por categoría.
+- **"Mencionar siempre" la cuenta** (una por mensaje) cuando hay cuentas creadas.
 - **No apagar n8n** hasta validar el backend propio en producción.
-- **Dos sesiones de Claude Code trabajan en paralelo** sobre la misma rama
-  (`claude/remote-control-yexmni`); coordinar para no pisarse (ver §18).
+- **Dos sesiones de Claude Code en paralelo** sobre la misma rama → coordinar
+  (pull antes, push inmediato, avisar archivos tocados).
 
 ---
 
-## 18. Riesgos
+## 17. Riesgos
 
-- Querer construir demasiado antes de lanzar / sobrecargar el V1.
+- Sobrecargar el V1 / construir demasiado antes de lanzar.
 - Mezclar Abakus con HBC App.
-- Prometer funciones que aún no existen (facturación, banca).
-- No guardar leads correctamente (waitlist no conectada).
+- Prometer funciones inexistentes (facturación, banca).
+- Waitlist no conectada → leads perdidos.
 - No validar con usuarios reales.
-- **Costos de IA/WhatsApp por usuario** (cada mensaje = llamada a Claude).
-- Temas fiscales si se lanza global.
-- **Dependencia de estado en memoria** (idempotencia y contexto conversacional):
-  se pierden en reinicios/multi-instancia → duplicados o pérdida de hilo.
-- **Ventana de 24 h de WhatsApp:** mensajes proactivos (recordatorios, tip diario)
-  fuera de la ventana requieren **plantillas aprobadas por Meta**; hoy se envían
-  como texto libre y Meta podría bloquearlos.
-- **Dos sesiones en paralelo** en la misma rama → conflictos si no se coordina.
-- Migración n8n → backend sin corte limpio → doble procesamiento o recordatorios
-  duplicados si ambos quedan activos.
+- **Costo de IA/WhatsApp por usuario** (cada mensaje = llamada a Claude).
+- **Estado en memoria** (idempotencia + contexto conversacional) → duplicados o
+  pérdida de hilo en reinicios/multi-instancia.
+- **Ventana de 24 h de WhatsApp:** recordatorios y tip diario fuera de la ventana
+  requieren **plantillas aprobadas por Meta**; hoy se envían como texto libre.
+- **Dos sesiones en la misma rama** → conflictos si no se coordina.
+- Migración n8n sin corte limpio → doble procesamiento o recordatorios duplicados.
 
 ---
 
-## 19. Pendientes (checklist)
+## 18. Pendientes (checklist)
 
-**Técnicos:**
-- [ ] Conectar formulario de landing a una base (waitlist).
-- [ ] Decidir si se captura WhatsApp y/o email.
-- [ ] Cerrar la migración n8n → backend (apagar crons de n8n primero).
-- [ ] Idempotencia y contexto conversacional **persistentes** (DB/Redis), no en memoria.
-- [ ] Definir si se crean entidades formales `clientes`/`proveedores`.
-- [ ] Estados de CxC/CxP enriquecidos (`vencida`, `parcial`) y pagos parciales.
-- [ ] Plantillas de mensaje aprobadas por Meta para envíos fuera de 24 h.
-- [ ] Consolidar el manejo de "preguntas de seguimiento" en un único mecanismo.
+**Técnicos**
+- [ ] Conectar la waitlist de la landing a una base.
+- [ ] Cerrar migración n8n → backend (apagar crons de n8n primero).
+- [ ] Persistir idempotencia y contexto conversacional (DB/Redis).
+- [ ] Consolidar el manejo de "preguntas de seguimiento" en un solo mecanismo.
+- [ ] Decidir si se crean entidades `clientes`/`proveedores`.
+- [ ] Estados enriquecidos de CxC/CxP (`vencida`, `parcial`) y pagos parciales.
+- [ ] Plantillas de mensaje Meta para envíos fuera de 24 h.
 
-**Comerciales / producto:**
-- [ ] Definir pricing final y límites del plan gratis.
-- [ ] Definir/garantizar el trial (15 días) para todos los nuevos usuarios.
-- [ ] Probar con ~5 usuarios reales y medir **costo por usuario**.
+**Comerciales / producto**
+- [ ] Pricing final y límites del plan gratis.
+- [ ] Definir/garantizar el trial para nuevos usuarios.
+- [ ] Probar con ~5 usuarios reales y medir costo por usuario.
 - [ ] Política de privacidad y términos de uso.
-- [ ] Decidir hosting de la landing (Vercel u otro).
+- [ ] Hosting de la landing (Vercel u otro).
+
+---
+
+## 19. Preguntas abiertas (a confirmar por el dueño)
+
+- ¿Trial: cuántos días y aplicado a todos los nuevos usuarios?
+- ¿Límites exactos del plan gratis vs. Básico vs. Pro?
+- ¿La waitlist captura WhatsApp, email o ambos? ¿A qué base?
+- ¿Clientes/proveedores como entidades formales (CRM) o sigue `contraparte`?
+- ¿Qué hace exactamente el flujo n8n actual? (para checklist de paridad).
 
 ---
 
 ## 20. Cómo usar este archivo
 
-**Toda nueva conversación de Claude Code debe comenzar leyendo este archivo.**
+**Toda nueva conversación de Claude Code debe empezar leyendo este archivo.**
 
 > "Antes de modificar cualquier parte del proyecto, lee `ABAKUS_MASTER_SPEC.md` y
-> respeta sus decisiones (§17). Si una solicitud contradice este documento, **avisa
+> respeta sus decisiones (§16). Si una solicitud contradice este documento, **avisa
 > primero y pide confirmación** antes de actuar."
 
-Complementos de contexto técnico: `abakus-backend/CLAUDE.md` (detalle de
-implementación) y `abakus-backend/migrations.sql` (esquema de DB).
-Para verificar qué versión está en producción: `GET /health` devuelve el commit
-desplegado.
+Contexto técnico complementario: `abakus-backend/CLAUDE.md` (implementación) y
+`abakus-backend/migrations.sql` (esquema). Versión en producción: `GET /health`.
 
 ---
 
 ## 21. Changelog
 
-> Registrar aquí cada actualización relevante del proyecto: fecha · cambio · motivo.
+> Registrar cada actualización relevante: fecha · cambio · motivo.
 
-- **2026-06-21** — Creación de `ABAKUS_MASTER_SPEC.md` como fuente de verdad del
-  proyecto. Motivo: preservar contexto entre sesiones de Claude Code y dejar
-  explícitas las decisiones tomadas. Estado del backend al momento de crearlo
-  (rama `claude/remote-control-yexmni`): registro NL multi-movimiento, categorías
-  aprendidas, multimoneda, correlativo por usuario, corregir/eliminar, CxC y CxP,
-  cuentas (bancos/caja) con saldos y transferencias, carga masiva Excel, reportes,
-  resumen/detalle/comparar/proyección/meta, recordatorios y tip diario (cron),
-  suscripción Mercado Pago, onboarding guiado, aprendizaje por usuario, contexto
-  conversacional (en memoria) y panel admin de aprendizaje.
+- **2026-06-21** — Reescritura del spec para reflejar el **estado real y actual**
+  de Abakus (antes era un template genérico). Documenta funcionalidades vigentes
+  (registro NL multi-movimiento, CxC/CxP, cuentas/saldos/transferencias,
+  correcciones, carga masiva Excel, resumen/detalle/reporte/comparar/proyección/
+  meta, aprendizaje por usuario, multimoneda, onboarding guiado, recordatorios y
+  tip diario, suscripción Mercado Pago, panel admin y `/health`), modelo de datos
+  real (usuarios, movimientos, cuentas_pendientes, cuentas, transferencias),
+  stack real (Claude haiku-4-5, Supabase, Mercado Pago, Railway) y decisiones.
+- **2026-06-21** — Creación inicial de `ABAKUS_MASTER_SPEC.md`.
