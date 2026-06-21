@@ -24,6 +24,10 @@ export interface Usuario {
   // Abakus recuerda para personalizar futuras conversaciones.
   // Requiere columna `memoria jsonb DEFAULT '[]'` en la tabla usuarios.
   memoria: string[] | null;
+  // Marca temporal del último mensaje ENTRANTE del usuario. Se usa para enviar
+  // mensajes proactivos (tip diario, recordatorios) solo dentro de la ventana de
+  // 24h de WhatsApp. Requiere columna `ultimo_mensaje_at timestamptz`.
+  ultimo_mensaje_at: string | null;
   created_at: string;
 }
 

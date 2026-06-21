@@ -608,15 +608,39 @@ export function marcarSaldado(
   return marcarPagada('por_pagar', userPhone, contraparte, monto);
 }
 
-/** Obtiene todos los usuarios activos (trial vigente o plan de pago). */
-export async function getUsuariosActivos(): Promise<Usuario[]> {
-  const { data, error } = await supabase
-    .from('usuarios')
-    .select('*')
-    .neq('onboarding_step', null); // excluye filas vacías; todos tienen este campo
+/**
+ * Usuarios que escribieron en las últimas 24h (ventana libre de WhatsApp).
+ * Incluye recién creados (sin `ultimo_mensaje_at` aún) vía `created_at`.
+ * Si la columna `ultimo_mensaje_at` no existe todavía, cae a `created_at`.
+ */
+export async function getUsuariosVentana24h(): Promise<Usuario[]> {
+  const desde = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  try {
+    const { data, error } = await supabase
+      .from('usuarios')
+      .select('*')
+      .or(`ultimo_mensaje_at.gte.${desde},and(ultimo_mensaje_at.is.null,created_at.gte.${desde})`);
+    if (error) throw error;
+    return (data ?? []) as Usuario[];
+  } catch (err) {
+    if (!esEsquemaFaltante(err as { code?: string; message?: string })) throw err;
+    // Columna ultimo_mensaje_at aún no migrada → aproxima por created_at.
+    const { data, error } = await supabase.from('usuarios').select('*').gte('created_at', desde);
+    if (error) throw error;
+    return (data ?? []) as Usuario[];
+  }
+}
 
-  if (error) throw error;
-  return (data ?? []) as Usuario[];
+/** Marca la hora del último mensaje entrante del usuario (ventana de 24h).
+ *  Tolerante: si la columna aún no existe, no rompe el flujo del mensaje. */
+export async function touchUltimoMensaje(phone: string): Promise<void> {
+  const { error } = await supabase
+    .from('usuarios')
+    .update({ ultimo_mensaje_at: new Date().toISOString() })
+    .eq('phone', phone);
+  if (error && !esEsquemaFaltante(error)) {
+    console.error('[abakus] No se pudo actualizar ultimo_mensaje_at:', error);
+  }
 }
 
 /** Cuentas pendientes con vencimiento dentro de N días, sin recordatorio enviado. */

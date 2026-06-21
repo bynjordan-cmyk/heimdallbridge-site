@@ -31,7 +31,7 @@ contabilidad completa, **no** reemplaza al contador.
 
 ## 2. Funcionalidades actuales (el corazón del documento)
 
-Todo esto **ya está implementado** en el backend (rama `claude/remote-control-yexmni`):
+Todo esto **ya está implementado** (rama `claude/remote-control-yexmni`):
 
 **Registro en lenguaje natural** ✅
 - Ingresos y egresos, **uno o varios en un mismo mensaje** ("vendí 50 mil el
@@ -62,7 +62,7 @@ Todo esto **ya está implementado** en el backend (rama `claude/remote-control-y
 - *"deshacer"* / *"borra el último"* elimina el último movimiento.
 
 **Consultas y reportes** ✅
-- `resumen` (mes) / `resumen mayo`: ingresos, egresos, balance, **proyección de
+- `resumen` / `resumen mayo`: ingresos, egresos, balance, **proyección de
   cierre**, desglose por categoría y meta.
 - `detalle` (lista de movimientos **en el chat**, alternativa al Excel).
 - `reporte` / `reporte mayo`: **Excel** (hojas: Resumen, Movimientos con #, Cuentas).
@@ -78,29 +78,27 @@ Todo esto **ya está implementado** en el backend (rama `claude/remote-control-y
 
 **Aprendizaje por usuario** ✅
 - Aprende y reutiliza: **negocio**, **tono**, **categorías frecuentes**,
-  **contrapartes**, y **memoria** (datos durables tipo "trabajo con boleta de
+  **contrapartes** y **memoria** (datos durables tipo "trabajo con boleta de
   honorarios"). Se inyecta en el prompt para personalizar interpretación y respuesta.
 
-**Multimoneda** ✅
-- Una moneda por usuario (ISO 4217), inferida por prefijo telefónico y cambiable
-  ("uso dólares"). Formatea montos según la moneda.
+**Multimoneda** ✅ — una moneda por usuario (ISO 4217), inferida por prefijo
+telefónico y cambiable ("uso dólares").
 
-**Onboarding guiado** ✅
-- Usuario nuevo: bienvenida → *"¿a qué te dedicas?"* (captura negocio) →
-  invitación al primer registro (incluye carga inicial multi-movimiento, cuentas
-  y moneda). Se puede *saltar*.
+**Onboarding guiado** ✅ — bienvenida → *"¿a qué te dedicas?"* (captura negocio) →
+invitación al primer registro (carga inicial multi-movimiento, cuentas y moneda).
+Se puede *saltar*.
 
 **Automatización (cron, zona America/Santiago)** ✅
 - **09:00** — recordatorios de cobros **y** pagos por vencer (solo al usuario).
 - **15:00** — "Sabías que..." tip financiero diario (rota por día).
+- Ambos envían **solo a usuarios dentro de la ventana de 24h de WhatsApp**
+  (ver §9 y §17).
 
-**Suscripción** ✅/🟡
-- Planes **Básico** y **Pro** vía **Mercado Pago** (flujo `suscribirme` → email →
-  plan → link → webhook activa). `planes` muestra precios reales.
+**Suscripción** ✅/🟡 — planes **Básico** y **Pro** vía **Mercado Pago**
+(`suscribirme` → email → plan → link → webhook activa). `planes` muestra precios.
 
-**Operación / admin** ✅
-- `GET /health` → estado + commit desplegado.
-- `GET /admin/aprendizaje?key=ADMIN_KEY` → panel de auditoría del aprendizaje.
+**Operación / admin** ✅ — `GET /health` (estado + commit) ·
+`GET /admin/aprendizaje?key=ADMIN_KEY` (auditoría del aprendizaje).
 
 ---
 
@@ -108,7 +106,7 @@ Todo esto **ya está implementado** en el backend (rama `claude/remote-control-y
 
 | Comando / frase | Acción |
 |---|---|
-| lenguaje natural (ingreso/egreso/deuda/etc.) | registra/corrige según interpretación de IA |
+| lenguaje natural (ingreso/egreso/deuda/etc.) | registra/corrige según la IA |
 | `resumen`, `saldo`, `resumen mayo` | balance del mes/mes indicado |
 | `detalle`, "muéstrame en el chat", "sin excel" | lista de movimientos en texto |
 | `reporte`, `informe`, `reporte mayo` | Excel |
@@ -124,7 +122,7 @@ Todo esto **ya está implementado** en el backend (rama `claude/remote-control-y
 | `deshacer`, `borra el último` | elimina último movimiento |
 | `ayuda`, `menú` | menú de capacidades |
 
-**Tipos que interpreta la IA** (`claude/interpreter.ts`): `ingreso`, `egreso`,
+**Tipos que interpreta la IA** (`claude/interpreter.ts`, 12): `ingreso`, `egreso`,
 `deuda` (CxC), `cobro`, `cuenta_pagar` (CxP), `saldar`, `corregir`, `eliminar`,
 `crear_cuenta`, `transferencia`, `consulta`, `desconocido`.
 
@@ -164,6 +162,16 @@ facturación/operación) y **Abakus** (después: control financiero).
 - **Cron:** `node-cron`. **Excel:** `exceljs`. **HTTP:** `axios`. ✅
 - Dependencias: `@anthropic-ai/sdk`, `@supabase/supabase-js`, `axios`, `express`,
   `exceljs`, `form-data`, `node-cron`, `dotenv`.
+
+**Endpoints HTTP** (`src/index.ts`):
+- `GET/POST {WEBHOOK_PATH}` (default `/webhook/abakus-whatsapp`) — verificación (GET)
+  y mensajes (POST; responde 200 y procesa en background).
+- `GET /health` — `{ status, service, version, startedAt }`; `version` = commit
+  desplegado (`RAILWAY_GIT_COMMIT_SHA`).
+- `GET /admin/aprendizaje?key=ADMIN_KEY[&format=json]` — panel de salud del
+  aprendizaje (404 si `ADMIN_KEY` vacío, 403 si no coincide).
+- `POST /webhook/mercadopago` — notificaciones de pago/suscripción.
+- `GET /gracias` — página de retorno tras el pago (`back_url` de Mercado Pago).
 
 **Variables de entorno** (`.env.example`): credenciales WhatsApp/Meta,
 `ANTHROPIC_API_KEY` + `ANTHROPIC_MODEL`, `SUPABASE_URL` + `SUPABASE_SERVICE_KEY`,
@@ -214,7 +222,7 @@ Ver `abakus-backend/migrations.sql` y `types.ts`.
 - **`usuarios`** — `id`, `phone` (E.164 con `+`), `nombre`, `plan`, `activo`,
   `negocio`, `tono`, `moneda`, `onboarding_step`, `trial_ends_at`, `email`,
   `estado_conversacion`, `meta_mensual`, `memoria` (jsonb), `pendiente` (jsonb),
-  `created_at`.
+  `ultimo_mensaje_at` (timestamptz; ventana de 24h), `created_at`.
 - **`movimientos`** — `id`, `user_phone`, `correlativo` (#N por usuario), `tipo`
   (`ingreso`|`egreso`), `monto`, `categoria`, `descripcion`, `fecha`, `cuenta_id`,
   `raw_message`, `created_at`.
@@ -229,8 +237,7 @@ Ver `abakus-backend/migrations.sql` y `types.ts`.
 **Notas de diseño actuales:**
 - "Cliente/proveedor" hoy es el texto `contraparte` en `cuentas_pendientes`. **No
   hay tablas `clientes`/`proveedores`** separadas.
-- Estado de CxC/CxP es booleano `pagado` (no `vencida`/`parcial`; **sin pagos
-  parciales**).
+- Estado de CxC/CxP es booleano `pagado` (no `vencida`/`parcial`; **sin pagos parciales**).
 - **Una moneda por usuario** (no por movimiento).
 - **No hay tabla de mensajes/historial**: la idempotencia (`utils/idempotency.ts`)
   y el contexto conversacional (`utils/contexto.ts`) son **en memoria** → se
@@ -243,24 +250,30 @@ Ver `abakus-backend/migrations.sql` y `types.ts`.
 1. Meta envía el webhook → responder **200 en < 5 s** y procesar en background.
 2. Idempotencia por `message_id` (en memoria).
 3. Buscar usuario por teléfono (**E.164 con `+`**, igual que n8n).
-4. Estados prioritarios: suscripción (email/plan), **esperando cuenta**, onboarding.
-5. **Comandos** (no pasan por IA, ver §3).
-6. Si no es comando → **Claude interpreta** con contexto: perfil aprendido,
-   último movimiento, conversación reciente, cuentas y moneda.
-7. Persistir aprendizaje (negocio/tono/memoria) y ejecutar la acción.
-8. Responder **amigable** (nunca JSON al usuario).
+4. Registrar `ultimo_mensaje_at` (marca la ventana de 24h para envíos proactivos).
+5. Estados prioritarios: suscripción (email/plan), **esperando cuenta**, onboarding.
+6. **Comandos** (no pasan por IA, ver §3).
+7. Si no es comando → **Claude interpreta** con contexto: perfil aprendido, último
+   movimiento, conversación reciente, cuentas y moneda.
+8. Persistir aprendizaje (negocio/tono/memoria) y ejecutar la acción.
+9. Responder **amigable** (nunca JSON al usuario).
+
+**Mensajes proactivos y ventana de 24h:** WhatsApp solo permite texto libre dentro
+de las 24h desde el último mensaje del usuario. Por eso recordatorios y tip diario
+usan `getUsuariosVentana24h()` (usuarios con `ultimo_mensaje_at` reciente). Para
+llegar fuera de esa ventana se requieren **plantillas aprobadas por Meta** (⛔).
 
 ---
 
 ## 10. IA y personalidad
 
-- **Modelo:** Claude `claude-haiku-4-5`, structured outputs (JSON Schema). El JSON
-  es interno; una capa lo convierte en respuesta amigable.
+- **Modelo:** Claude `claude-haiku-4-5`, structured outputs. El JSON es interno;
+  una capa lo convierte en respuesta amigable (nunca JSON al usuario).
 - **Personalidad:** claro, cercano, útil, breve, cero regañón, motivador sin
   exagerar. No saluda en cada mensaje (asume conversación en curso); responde
   presente si lo llaman por su nombre. Evita jerga contable.
 - **Reglas clave del prompt:** no inventar datos; preguntar si falta algo crítico
-  o si hay ambigüedad de dirección; reutilizar categorías existentes del usuario;
+  o ante ambigüedad de dirección; reutilizar categorías existentes del usuario;
   nunca prometer sitios/apps externas; nunca decir que es "gratis" ni inventar
   precios (derivar a `planes`/`suscribirme`).
 
@@ -268,13 +281,14 @@ Ver `abakus-backend/migrations.sql` y `types.ts`.
 
 ## 11. Monetización (estado real)
 
-- **Suscripción mensual** vía **Mercado Pago**. Planes por env: Básico `4990`,
-  Pro `9990` CLP.
-- Flujo `suscribirme` → email → plan → link de pago → webhook activa. ✅
+- **Suscripción mensual** vía **Mercado Pago**. Planes Básico/Pro; precios por
+  variable de entorno (`MERCADOPAGO_PRECIO_PLAN_BASICO`/`_PRO`; en `.env.example`:
+  **4990 / 9990 CLP**; **default `0`** en `config.ts` si no se setean en Railway). ⚠️
+- Flujo `suscribirme` → email → plan → link → webhook activa. ✅
 - Límite Plan Básico: hasta 3 cuentas por cobrar/pagar activas. ✅
 - **Trial:** existe `trial_ends_at` + `accesoVigente`; usuarios sin ese campo
-  **no se bloquean** (compatibilidad con n8n). El trial de N días **no está
-  garantizado para todos los nuevos usuarios** → decisión pendiente. 🟡
+  **no se bloquean** (compatibilidad n8n). El trial de N días **no está garantizado
+  para todos los nuevos usuarios** → decisión pendiente. 🟡
 - Definir límites del plan gratis (movimientos/recordatorios/consultas/exportes). ⛔
 
 ---
@@ -282,8 +296,8 @@ Ver `abakus-backend/migrations.sql` y `types.ts`.
 ## 12. Landing, marca y canales
 
 - **Dominio:** heimdallbridge.com/abakus (`abakus/index.html`). ✅
-- **Marca:** Abakus (con K). **Redes:** `@heyabakus`. Concepto visual: ábaco
-  moderno, amigable.
+- **Marca:** Abakus (con K). **Redes:** `@heyabakus`. Concepto: ábaco moderno,
+  amigable.
 - **Canal principal:** WhatsApp. **Secundarios:** landing, Instagram, TikTok,
   waitlist/beta.
 - **Embudo:** redes → landing → waitlist → beta → WhatsApp → plan pago.
@@ -345,6 +359,7 @@ mejora de prompts ✅ (continuo) · historial conversacional persistente 🟡 (h
 - **Cobrar/saldar solo marca pagado; NO crea movimiento.**
 - **"Sin clasificar"** por defecto; nunca bloquear el registro por categoría.
 - **"Mencionar siempre" la cuenta** (una por mensaje) cuando hay cuentas creadas.
+- **Mensajes proactivos solo dentro de la ventana de 24h** (sin plantillas Meta aún).
 - **No apagar n8n** hasta validar el backend propio en producción.
 - **Dos sesiones de Claude Code en paralelo** sobre la misma rama → coordinar
   (pull antes, push inmediato, avisar archivos tocados).
@@ -361,8 +376,10 @@ mejora de prompts ✅ (continuo) · historial conversacional persistente 🟡 (h
 - **Costo de IA/WhatsApp por usuario** (cada mensaje = llamada a Claude).
 - **Estado en memoria** (idempotencia + contexto conversacional) → duplicados o
   pérdida de hilo en reinicios/multi-instancia.
-- **Ventana de 24 h de WhatsApp:** recordatorios y tip diario fuera de la ventana
-  requieren **plantillas aprobadas por Meta**; hoy se envían como texto libre.
+- **Ventana de 24 h de WhatsApp:** recordatorios y tip diario solo llegan a quien
+  escribió en las últimas 24h; para el resto se necesitan **plantillas aprobadas
+  por Meta**. Además, el cron solo dispara si el proceso está vivo a esa hora
+  (Railway).
 - **Dos sesiones en la misma rama** → conflictos si no se coordina.
 - Migración n8n sin corte limpio → doble procesamiento o recordatorios duplicados.
 
@@ -374,10 +391,9 @@ mejora de prompts ✅ (continuo) · historial conversacional persistente 🟡 (h
 - [ ] Conectar la waitlist de la landing a una base.
 - [ ] Cerrar migración n8n → backend (apagar crons de n8n primero).
 - [ ] Persistir idempotencia y contexto conversacional (DB/Redis).
-- [ ] Consolidar el manejo de "preguntas de seguimiento" en un solo mecanismo.
+- [ ] Plantillas de mensaje Meta para envíos fuera de 24 h.
 - [ ] Decidir si se crean entidades `clientes`/`proveedores`.
 - [ ] Estados enriquecidos de CxC/CxP (`vencida`, `parcial`) y pagos parciales.
-- [ ] Plantillas de mensaje Meta para envíos fuera de 24 h.
 
 **Comerciales / producto**
 - [ ] Pricing final y límites del plan gratis.
@@ -415,12 +431,11 @@ Contexto técnico complementario: `abakus-backend/CLAUDE.md` (implementación) y
 
 > Registrar cada actualización relevante: fecha · cambio · motivo.
 
-- **2026-06-21** — Reescritura del spec para reflejar el **estado real y actual**
-  de Abakus (antes era un template genérico). Documenta funcionalidades vigentes
-  (registro NL multi-movimiento, CxC/CxP, cuentas/saldos/transferencias,
-  correcciones, carga masiva Excel, resumen/detalle/reporte/comparar/proyección/
-  meta, aprendizaje por usuario, multimoneda, onboarding guiado, recordatorios y
-  tip diario, suscripción Mercado Pago, panel admin y `/health`), modelo de datos
-  real (usuarios, movimientos, cuentas_pendientes, cuentas, transferencias),
-  stack real (Claude haiku-4-5, Supabase, Mercado Pago, Railway) y decisiones.
-- **2026-06-21** — Creación inicial de `ABAKUS_MASTER_SPEC.md`.
+- **2026-06-21** — Tips/recordatorios ahora usan `getUsuariosVentana24h()` +
+  `ultimo_mensaje_at` (antes `getUsuariosActivos` con un filtro roto que devolvía
+  0 usuarios → no se enviaba nada). Documentada la ventana de 24h de WhatsApp.
+- **2026-06-21** — Reescritura del spec al **estado real y actual** de Abakus
+  (antes era un template genérico): funcionalidades vigentes, comandos reales,
+  endpoints HTTP, modelo de datos real, stack real y decisiones tomadas.
+- **2026-06-21** — Creación inicial de `ABAKUS_MASTER_SPEC.md` como fuente de
+  verdad del proyecto, para preservar contexto entre sesiones de Claude Code.
