@@ -4,30 +4,56 @@ import { config } from '../config';
 
 const BASE = `https://graph.facebook.com/${config.whatsapp.graphVersion}/${config.whatsapp.phoneNumberId}`;
 
+// WhatsApp rechaza textos de más de 4096 caracteres. Dividimos con margen.
+const MAX_LEN = 3900;
+
 function authHeaders() {
   return { Authorization: `Bearer ${config.whatsapp.accessToken}` };
 }
 
 /**
+ * Divide un texto largo en partes <= max, prefiriendo cortar en salto de línea
+ * o espacio para no partir palabras/líneas a la mitad.
+ */
+function dividirMensaje(texto: string, max: number): string[] {
+  if (texto.length <= max) return texto.trim().length ? [texto] : [];
+  const partes: string[] = [];
+  let resto = texto;
+  while (resto.length > max) {
+    let corte = resto.lastIndexOf('\n', max);
+    if (corte < max * 0.5) corte = resto.lastIndexOf(' ', max);
+    if (corte < max * 0.5) corte = max; // sin buen punto de corte: corta duro
+    partes.push(resto.slice(0, corte).trimEnd());
+    resto = resto.slice(corte).trimStart();
+  }
+  if (resto.trim().length) partes.push(resto);
+  return partes;
+}
+
+/**
  * Envía un mensaje de texto al usuario vía WhatsApp Cloud API.
  * `to` puede venir con o sin '+'; Meta espera el wa_id (sin '+').
+ * Si el texto supera el límite de WhatsApp, se envía en varias partes ordenadas.
  */
 export async function sendText(to: string, body: string): Promise<void> {
   const recipient = to.replace(/^\+/, '');
+  const partes = dividirMensaje(body ?? '', MAX_LEN);
 
-  await axios.post(
-    `${BASE}/messages`,
-    {
-      messaging_product: 'whatsapp',
-      to: recipient,
-      type: 'text',
-      text: { body },
-    },
-    {
-      headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-      timeout: 10_000,
-    },
-  );
+  for (const parte of partes) {
+    await axios.post(
+      `${BASE}/messages`,
+      {
+        messaging_product: 'whatsapp',
+        to: recipient,
+        type: 'text',
+        text: { body: parte },
+      },
+      {
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        timeout: 10_000,
+      },
+    );
+  }
 }
 
 /**
