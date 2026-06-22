@@ -23,7 +23,14 @@ import {
   registrarPendientesEnCuenta,
   resolverCuentaPendiente,
 } from '../flows/cuentas';
-import { buscarCuenta } from '../supabase/queries';
+import { buscarCuenta, actualizarMovimiento } from '../supabase/queries';
+import {
+  correlativoEsperado,
+  esNegativaCategoria,
+  esperandoCategoria,
+  limpiarEsperandoCategoria,
+  pareceCategoria,
+} from '../flows/clasificacion';
 import {
   accesoVigente,
   descripcionPlanes,
@@ -150,6 +157,32 @@ async function procesar(mensaje: MensajeEntrante): Promise<void> {
     const respuesta = await registrarPendientesEnCuenta(usuario, items, resuelto.cuenta);
     await sendText(mensaje.phone, respuesta);
     return;
+  }
+
+  // Esperando la categoría de un movimiento recién registrado "Sin clasificar".
+  // Determinista: el estado guarda el #correlativo; la respuesta se aplica a ese
+  // movimiento, sin depender de que la IA infiera una corrección.
+  if (esperandoCategoria(usuario)) {
+    const corr = correlativoEsperado(usuario);
+    const t = mensaje.texto.trim();
+    if (esNegativaCategoria(t)) {
+      await limpiarEsperandoCategoria(usuario);
+      await sendText(mensaje.phone, 'Sin problema, lo dejo *Sin clasificar* 👍 Puedes clasificarlo luego con _"corrige el #N a [categoría]"_.');
+      return;
+    }
+    if (corr != null && !detectarComando(t) && pareceCategoria(t)) {
+      await limpiarEsperandoCategoria(usuario);
+      const res = await actualizarMovimiento(usuario.phone, corr, { categoria: t });
+      await sendText(
+        mensaje.phone,
+        res
+          ? `🏷️ Listo, clasifiqué el movimiento #${corr} como *${res.actualizado.categoria ?? t}*.`
+          : `No encontré el movimiento #${corr} 🤔`,
+      );
+      return;
+    }
+    // No parece categoría (comando o movimiento nuevo): limpiamos y seguimos el flujo normal.
+    await limpiarEsperandoCategoria(usuario);
   }
 
   // Carga masiva: el usuario envió un documento Excel.

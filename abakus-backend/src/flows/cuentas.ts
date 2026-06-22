@@ -9,7 +9,8 @@ import {
   updateUsuario,
 } from '../supabase/queries';
 import { formatMonto } from '../utils/format';
-import { sugerenciaClasificar } from './registro';
+import { esSinClasificar } from './registro';
+import { armarEsperandoCategoria, PREGUNTA_CATEGORIA } from './clasificacion';
 
 const ESPERANDO_CUENTA = 'esperando_cuenta';
 
@@ -155,7 +156,7 @@ export async function registrarPendientesEnCuenta(
   const f = (n: number) => formatMonto(n, user.moneda);
   const hoy = new Date().toISOString().slice(0, 10);
 
-  await insertMovimientosMasivo(
+  const insertados = await insertMovimientosMasivo(
     user.phone,
     items.map((m) => ({
       tipo: m.tipo,
@@ -183,6 +184,12 @@ export async function registrarPendientesEnCuenta(
     if (egresos > 0) msg += `\n💸 Egresos: ${f(egresos)}`;
   }
   if (saldo) msg += `\n\nSaldo de ${cuenta.nombre}: *${f(saldo.saldo)}*`;
-  if (unico) msg += sugerenciaClasificar(unico.categoria);
+
+  // Si es un único movimiento y quedó sin clasificar, armamos el estado
+  // determinista para que la próxima respuesta lo clasifique (no se pierde).
+  if (unico && esSinClasificar(unico.categoria)) {
+    await armarEsperandoCategoria(user, insertados[0]?.correlativo ?? null);
+    msg += PREGUNTA_CATEGORIA;
+  }
   return msg;
 }

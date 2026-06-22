@@ -20,6 +20,7 @@ function refTag(correlativo: number | null): string {
 }
 import { formatMonto } from '../utils/format';
 import { mesActual } from '../reports/periodo';
+import { armarEsperandoCategoria, PREGUNTA_CATEGORIA } from './clasificacion';
 
 const LIMITE_CUENTAS_BASICO = 3;
 
@@ -231,11 +232,18 @@ async function confirmarMovimientoUnico(
   const detalle = [f(item.monto), item.categoria, item.descripcion].filter(Boolean).join(' | ');
   const ref = refTag(nuevo.correlativo);
   const victoria = nuevo.correlativo === 1 ? PRIMERA_VICTORIA : '';
-  const sugClasif = sugerenciaClasificar(item.categoria);
+
+  // Si quedó sin clasificar, armamos el estado determinista para que la próxima
+  // respuesta del usuario ("Alimentos") clasifique ESTE movimiento (no se pierde).
+  let preguntaCat = '';
+  if (esSinClasificar(item.categoria)) {
+    await armarEsperandoCategoria(user, nuevo.correlativo);
+    preguntaCat = PREGUNTA_CATEGORIA;
+  }
 
   if (item.tipo === 'ingreso') {
     const tip = tipIngreso(item.monto);
-    return `✅ Ingreso registrado${ref}\n💰 ${detalle}${sugClasif}${tip}${victoria}`;
+    return `✅ Ingreso registrado${ref}\n💰 ${detalle}${preguntaCat}${tip}${victoria}`;
   }
 
   // Egreso: calcular balance del mes y alertar si es negativo.
@@ -249,7 +257,7 @@ async function confirmarMovimientoUnico(
     ? `\n\n⚠️ _Balance del mes: -${f(Math.abs(balance))}. Escribe *resumen* para ver el detalle._`
     : '';
 
-  return `📤 Egreso registrado${ref}\n💸 ${detalle}${sugClasif}${alertaBalance}${victoria}`;
+  return `📤 Egreso registrado${ref}\n💸 ${detalle}${preguntaCat}${alertaBalance}${victoria}`;
 }
 
 /** Sugerencia gentil para clasificar cuando el movimiento quedó "Sin clasificar". */
