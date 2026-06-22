@@ -608,6 +608,49 @@ export function marcarSaldado(
   return marcarPagada('por_pagar', userPhone, contraparte, monto);
 }
 
+export interface CuentaPendienteCorregida {
+  anterior: CuentaPorCobrar;
+  actualizada: CuentaPorCobrar;
+}
+
+/**
+ * Actualiza la última cuenta pendiente (CxC/CxP no pagada) con los cambios
+ * indicados. Sirve para seguimientos: "no, págalo el 5", "te dije que era ENEL".
+ * Devuelve antes/después, o null si no hay cuenta pendiente.
+ */
+export async function actualizarUltimaCuentaPendiente(
+  userPhone: string,
+  cambios: { contraparte?: string | null; monto?: number | null; fechaVencimiento?: string | null },
+): Promise<CuentaPendienteCorregida | null> {
+  const { data, error } = await supabase
+    .from('cuentas_pendientes')
+    .select('*')
+    .eq('user_phone', userPhone)
+    .eq('pagado', false)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) return null;
+  const anterior = data as CuentaPorCobrar;
+
+  const upd: Record<string, unknown> = {};
+  if (cambios.contraparte != null) upd.contraparte = cambios.contraparte;
+  if (cambios.monto != null) upd.monto = cambios.monto;
+  if (cambios.fechaVencimiento != null) upd.fecha_vencimiento = cambios.fechaVencimiento;
+  if (Object.keys(upd).length === 0) return { anterior, actualizada: anterior };
+
+  const { data: d2, error: e2 } = await supabase
+    .from('cuentas_pendientes')
+    .update(upd)
+    .eq('id', anterior.id)
+    .select()
+    .single();
+  if (e2) throw e2;
+  return { anterior, actualizada: d2 as CuentaPorCobrar };
+}
+
 /**
  * Usuarios que escribieron en las últimas 24h (ventana libre de WhatsApp).
  * Incluye recién creados (sin `ultimo_mensaje_at` aún) vía `created_at`.

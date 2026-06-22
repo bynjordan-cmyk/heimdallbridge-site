@@ -1,10 +1,10 @@
 import { Request, Response } from 'express';
 import { Interpretacion, MensajeEntrante, Usuario, WhatsAppWebhookBody } from '../types';
 import { yaProcesado } from '../utils/idempotency';
-import { getUsuarioByPhone, updateUsuario, agregarAprendizaje, getUltimoMovimiento, touchUltimoMensaje, CuentasNoDisponibleError } from '../supabase/queries';
+import { getUsuarioByPhone, updateUsuario, agregarAprendizaje, touchUltimoMensaje, CuentasNoDisponibleError } from '../supabase/queries';
 import { interpretar } from '../claude/interpreter';
 import { construirPerfil } from '../aprendizaje/perfil';
-import { recordarRespuesta, ultimaRespuesta } from '../utils/contexto';
+import { historial, registrarTurno } from '../utils/contexto';
 import { esMonedaSoportada, formatMonto } from '../utils/format';
 import { sendText } from '../whatsapp/sender';
 import { enOnboarding, iniciarOnboarding, invitacionPrimerRegistro } from '../flows/onboarding';
@@ -242,29 +242,20 @@ async function procesar(mensaje: MensajeEntrante): Promise<void> {
     return;
   }
 
-  // Interpretación con Claude, alimentada con el perfil aprendido y el último
-  // movimiento (para que las correcciones sepan a qué se refieren).
-  const [perfil, ultimo, cuentas] = await Promise.all([
+  // Interpretación con Claude, alimentada con el perfil aprendido y el HISTORIAL
+  // REAL de la conversación (turnos previos), para entender seguimientos sin
+  // perder el hilo ni filtrar datos de conversaciones viejas.
+  const [perfil, cuentas] = await Promise.all([
     construirPerfil(usuario),
-    getUltimoMovimiento(usuario.phone).catch(() => null),
     nombresCuentas(usuario.phone).catch(() => [] as string[]),
   ]);
-  const ctxUltimo = ultimo
-    ? `\n\nÚLTIMO MOVIMIENTO DEL USUARIO${
-        ultimo.correlativo != null ? ` (#${ultimo.correlativo})` : ''
-      } (úsalo si el mensaje corrige o se refiere a algo recién registrado): ${
-        ultimo.tipo
-      } de ${formatMonto(Number(ultimo.monto), usuario.moneda)}${ultimo.categoria ? ` en "${ultimo.categoria}"` : ''}.`
-    : '';
-  const reciente = ultimaRespuesta(usuario.phone);
-  const ctxConversacion = reciente
-    ? `\n\nCONVERSACIÓN RECIENTE — tu último mensaje al usuario fue: "${reciente.slice(0, 300)}". Si este mensaje del usuario responde a eso (por ejemplo, le pediste la categoría/origen de un movimiento y ahora te la da, como "mi salario", "fue un cliente" o "comida"), interprétalo en ese contexto: devuelve tipo="corregir" con referencia = el # del último movimiento y categoria = lo que respondió.`
-    : '';
+  const historialPrevio = historial(usuario.phone);
   const interp = await interpretar(mensaje.texto, {
     nombre: usuario.nombre,
-    perfil: perfil + ctxUltimo + ctxConversacion,
+    perfil,
     moneda: usuario.moneda,
     cuentas,
+    historial: historialPrevio,
   });
 
   const usaCuentas = cuentas.length > 0;
@@ -345,8 +336,10 @@ async function procesar(mensaje: MensajeEntrante): Promise<void> {
     respuesta = interp.respuesta;
   }
 
-  // Guardamos la respuesta para dar contexto a un posible mensaje de seguimiento.
-  recordarRespuesta(usuario.phone, respuesta);
+  // Guardamos el turno (usuario + Abakus) en el historial real, para que el
+  // próximo mensaje de seguimiento se entienda en contexto.
+  registrarTurno(usuario.phone, 'user', mensaje.texto);
+  registrarTurno(usuario.phone, 'assistant', respuesta);
   await sendText(mensaje.phone, respuesta);
 }
 

@@ -45,6 +45,8 @@ MOVIMIENTOS (lo más importante para registrar ingresos y egresos):
 - Los campos de dinero del nivel superior (monto/categoria/descripcion) son SOLO para "corregir". Para ingreso/egreso usa "movimientos"; déjalos en null arriba.
 
 REGLAS:
+- HISTORIAL Y SEGUIMIENTO (clave): recibes los turnos previos de la conversación como mensajes reales. ÚSALOS para entender respuestas de seguimiento y NO perder el hilo ni reinventar datos. Ejemplos: si acabas de registrar una cuenta por pagar a ENEL y el usuario dice "no, págalo el 5 de julio", eso es la FECHA DE VENCIMIENTO de ESA cuenta → tipo="corregir" con fecha_vencimiento="2026-07-05" (no crees una cuenta nueva ni inventes el monto). Si dice "te dije que era a ENEL" → tipo="corregir" con contraparte="ENEL". Si respondes una pregunta tuya ("¿qué categoría?") y el usuario contesta "Alimentos" → tipo="corregir" con categoria="Alimentación". NUNCA tomes montos o datos de movimientos viejos del historial para un registro nuevo; cada monto debe venir del mensaje actual.
+- "corregir" sobre cuentas por cobrar/pagar: cuando el usuario ajusta la última deuda/cuenta registrada, devuelve en "corregir" solo lo que cambia: fecha_vencimiento (YYYY-MM-DD), contraparte y/o monto. El sistema lo aplica a la última cuenta pendiente.
 - Abakus es MULTIMONEDA (Chile y toda LATAM, más USD/EUR). La moneda del usuario se te indica en el contexto (MONEDA DEL USUARIO). Interpreta los montos en ESA moneda salvo que el usuario mencione otra distinta.
 - Separadores de miles/decimales según el país: en casi toda LATAM "." separa miles y "," separa decimales (ej. "$1.500" = 1500; "1.299,90" = 1299.9). En USD/inglés es al revés ("$1,500.00" = 1500). Usa la convención del país del usuario; ante la duda, elige el monto entero más razonable.
 - "mil"/"luca" en lenguaje coloquial multiplica por 1000 SOLO cuando el número es chico: "3 mil"/"3mil"/"3 lucas" = 3000, "50 mil" = 50000. Pero si el número antes de "mil" ya es grande (≥1000), "mil" suele ser muletilla y el monto es ese número tal cual: "3000 mil" = 3000 (NO 3.000.000), "5000 mil" = 5000. Ante la duda, elige el monto más bajo y razonable.
@@ -168,7 +170,13 @@ const RESPUESTA_FALLBACK = 'No estoy seguro de haber entendido 🤔 ¿Me lo cuen
 
 export async function interpretar(
   texto: string,
-  contexto?: { nombre?: string | null; perfil?: string; moneda?: string | null; cuentas?: string[] },
+  contexto?: {
+    nombre?: string | null;
+    perfil?: string;
+    moneda?: string | null;
+    cuentas?: string[];
+    historial?: { role: 'user' | 'assistant'; text: string }[];
+  },
 ): Promise<Interpretacion> {
   const dato = contexto?.nombre
     ? `\n\nDATO DEL USUARIO: Su nombre es "${contexto.nombre}". Úsalo con naturalidad en tus respuestas y, si pregunta cómo se llama, díselo directamente.`
@@ -182,11 +190,18 @@ export async function interpretar(
 
   const perfil = contexto?.perfil ?? '';
 
+  // Historial real de la conversación (turnos previos) para entender mensajes de
+  // seguimiento sin perder el hilo. Se pasa como mensajes de verdad.
+  const previos = (contexto?.historial ?? []).map((t) => ({
+    role: t.role,
+    content: t.text,
+  }));
+
   const response = await client.messages.create({
     model: config.anthropic.model,
     max_tokens: 1024,
     system: SYSTEM_PROMPT.replace('${HOY}', hoyISO()) + dato + moneda + cuentas + perfil,
-    messages: [{ role: 'user', content: texto }],
+    messages: [...previos, { role: 'user', content: texto }],
     output_config: { format: { type: 'json_schema', schema: SCHEMA } },
   });
 

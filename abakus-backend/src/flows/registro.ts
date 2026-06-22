@@ -12,6 +12,7 @@ import {
   getMovimientosPeriodo,
   buscarCuenta,
   crearCuenta,
+  actualizarUltimaCuentaPendiente,
 } from '../supabase/queries';
 
 /** Etiqueta de correlativo, ej. " #42" (vacío si aún no hay numeración). */
@@ -48,6 +49,42 @@ export async function handleRegistro(
       return `Mmm, no encontré ninguna cuenta ${quien} pendiente 🤔 ¿Ya la habías saldado?`;
     }
     return `✅ ¡Pago registrado!\n👤 ${cuenta.contraparte ?? 'Sin contraparte'} | ${f(Number(cuenta.monto))} marcado como *saldado*. 🎉`;
+  }
+
+  // === Corregir la última cuenta por cobrar/pagar (seguimiento) ===
+  // Si la corrección trae fecha de vencimiento o contraparte (datos propios de
+  // una CxC/CxP, no de un movimiento) y no apunta a un # de movimiento, la
+  // aplicamos a la última cuenta pendiente. Ej: "no, págalo el 5", "era a ENEL".
+  if (
+    interp.tipo === 'corregir' &&
+    interp.referencia == null &&
+    interp.nuevo_tipo == null &&
+    !interp.cuenta &&
+    (interp.fecha_vencimiento != null || interp.contraparte != null)
+  ) {
+    const res = await actualizarUltimaCuentaPendiente(user.phone, {
+      contraparte: interp.contraparte ?? undefined,
+      monto: interp.monto ?? undefined,
+      fechaVencimiento: interp.fecha_vencimiento ?? undefined,
+    });
+    if (res) {
+      const { anterior, actualizada } = res;
+      const cambios: string[] = [];
+      if ((anterior.contraparte ?? '') !== (actualizada.contraparte ?? '')) {
+        cambios.push(`👤 ${anterior.contraparte ?? 'Sin contraparte'} → *${actualizada.contraparte ?? 'Sin contraparte'}*`);
+      }
+      if (Number(anterior.monto) !== Number(actualizada.monto)) {
+        cambios.push(`💲 ${f(Number(anterior.monto))} → *${f(Number(actualizada.monto))}*`);
+      }
+      if ((anterior.fecha_vencimiento ?? '') !== (actualizada.fecha_vencimiento ?? '')) {
+        cambios.push(`📅 Vence: *${actualizada.fecha_vencimiento ?? '—'}*`);
+      }
+      const etiqueta = actualizada.tipo === 'por_pagar' ? 'Cuenta por pagar' : 'Cuenta por cobrar';
+      if (cambios.length > 0) {
+        return `✏️ ${etiqueta} actualizada\n👤 ${actualizada.contraparte ?? 'Sin contraparte'} | ${f(Number(actualizada.monto))}\n${cambios.join('\n')}`;
+      }
+    }
+    // Si no había cuenta pendiente, cae al flujo normal de corrección de movimiento.
   }
 
   // === Corregir un movimiento (por #referencia o el último) ===
