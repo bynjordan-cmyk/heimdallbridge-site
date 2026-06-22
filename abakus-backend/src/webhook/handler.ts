@@ -13,6 +13,13 @@ import { detectarComando, handleComando } from '../flows/consulta';
 import { handleReporte } from '../flows/reporte';
 import { handleCargaMasiva, handlePlantilla } from '../flows/carga';
 import {
+  esFactura,
+  handleFactura,
+  esperandoConfirmacionFactura,
+  esAfirmacionFactura,
+  esNegacionFactura,
+} from '../flows/factura';
+import {
   esperandoCuenta,
   handleCrearCuenta,
   handleListarCuentas,
@@ -90,6 +97,21 @@ function extraerMensaje(body: WhatsAppWebhookBody): MensajeEntrante | null {
         mediaId: message.document.id,
         filename: message.document.filename ?? 'archivo.xlsx',
         mimeType: message.document.mime_type ?? '',
+      },
+    };
+  }
+
+  // Imagen (foto de factura/boleta): se trata como documento con mimeType image/*.
+  if (message.type === 'image' && message.image?.id) {
+    return {
+      phone,
+      texto: '',
+      messageId: message.id,
+      nombre,
+      documento: {
+        mediaId: message.image.id,
+        filename: 'factura.jpg',
+        mimeType: message.image.mime_type ?? 'image/jpeg',
       },
     };
   }
@@ -185,11 +207,45 @@ async function procesar(mensaje: MensajeEntrante): Promise<void> {
     await limpiarEsperandoCategoria(usuario);
   }
 
-  // Carga masiva: el usuario envió un documento Excel.
+  // Confirmación de una factura/boleta leída (foto/PDF). Solo aplica a respuestas
+  // de texto; si llega otro documento, cae al bloque de documento (nueva factura).
+  if (esperandoConfirmacionFactura(usuario) && !mensaje.documento) {
+    const t = mensaje.texto.trim();
+    const items = usuario.pendiente ?? [];
+    if (esNegacionFactura(t)) {
+      await limpiarPendiente(usuario);
+      await sendText(mensaje.phone, 'Listo, descarté la factura 👍');
+      return;
+    }
+    if (esAfirmacionFactura(t) && items.length > 0) {
+      await limpiarPendiente(usuario);
+      if (!accesoVigente(usuario)) {
+        await sendText(mensaje.phone, mensajeTrialVencido());
+        return;
+      }
+      const cuentas = await nombresCuentas(usuario.phone).catch(() => [] as string[]);
+      const respuesta = cuentas.length > 0
+        ? await pedirCuenta(usuario, items)
+        : await registrarMovimientos(usuario, items, 'Factura/boleta');
+      await sendText(mensaje.phone, respuesta);
+      return;
+    }
+    // Ni sí ni no claro: re-preguntamos sin perder lo leído.
+    await sendText(mensaje.phone, '¿Registro la factura que leí? Responde *sí* para confirmar o *no* para descartar. 🙂');
+    return;
+  }
+
+  // Documento entrante: factura/boleta (foto o PDF) o Excel (carga masiva).
   if (mensaje.documento) {
     await salirDeOnboarding(usuario);
     if (!accesoVigente(usuario)) {
       await sendText(mensaje.phone, mensajeTrialVencido());
+      return;
+    }
+    if (esFactura(mensaje.documento)) {
+      await sendText(mensaje.phone, '🧾 Leyendo tu factura, un momento...');
+      const respuesta = await handleFactura(usuario, mensaje.documento);
+      await sendText(mensaje.phone, respuesta);
       return;
     }
     await sendText(mensaje.phone, '📥 Recibí tu archivo, procesando la carga masiva...');

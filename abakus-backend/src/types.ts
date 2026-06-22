@@ -180,4 +180,5 @@ export interface WhatsAppMessage {
   type: string;
   text?: { body: string };
   document?: { id: string; mime_type: string; filename?: string };
+  image?: { id: string; mime_type: string };
 }
