@@ -124,6 +124,15 @@ created_at        timestamptz DEFAULT now()
 > UPDATE usuarios SET moneda = 'CLP' WHERE moneda IS NULL;
 > ```
 
+> **Migración requerida para la ventana de 24h:** los mensajes proactivos (tip
+> diario y recordatorios) se envían solo a quienes escribieron en las últimas 24h.
+> Requiere `ultimo_mensaje_at timestamptz` en `usuarios`, que se actualiza en cada
+> mensaje entrante (`touchUltimoMensaje`). Degrada con gracia si falta (no rompe el
+> mensaje; `getUsuariosVentana24h` aproxima por `created_at`).
+> ```sql
+> ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS ultimo_mensaje_at timestamptz;
+> ```
+
 ## Aprendizaje del usuario (`src/aprendizaje/perfil.ts`)
 
 Abakus personaliza la interpretación de Claude con un "perfil" del usuario que

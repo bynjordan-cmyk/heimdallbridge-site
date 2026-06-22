@@ -170,6 +170,8 @@ facturación/operación) y **Abakus** (después: control financiero).
   desplegado (`RAILWAY_GIT_COMMIT_SHA`).
 - `GET /admin/aprendizaje?key=ADMIN_KEY[&format=json]` — panel de salud del
   aprendizaje (404 si `ADMIN_KEY` vacío, 403 si no coincide).
+- `GET /admin/enviar-tip?key=ADMIN_KEY` — dispara manualmente el "Sabías que..."
+  del día (prueba sin esperar el cron de las 15:00); responde `{ ok, enviados }`.
 - `POST /webhook/mercadopago` — notificaciones de pago/suscripción.
 - `GET /gracias` — página de retorno tras el pago (`back_url` de Mercado Pago).
 
