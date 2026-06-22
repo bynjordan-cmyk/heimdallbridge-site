@@ -191,9 +191,16 @@ export async function handleRegistro(
   };
   await (esPorPagar ? insertCuentaPorPagar(datos) : insertCuentaPorCobrar(datos));
 
-  const vence = interp.fecha_vencimiento ? ` | vence ${interp.fecha_vencimiento}` : '';
   const titulo = esPorPagar ? '📌 Cuenta por pagar registrada' : '📋 Cuenta por cobrar registrada';
-  return `${titulo}\n👤 ${interp.contraparte ?? 'Sin contraparte'} | ${f(interp.monto)}${vence}`;
+  const base = `${titulo}\n👤 ${interp.contraparte ?? 'Sin contraparte'} | ${f(interp.monto)}`;
+
+  // Si no trae fecha de vencimiento, la preguntamos. La respuesta del usuario
+  // ("el 5 de julio") se aplica a esta misma cuenta vía corregir (usa el
+  // historial), no crea una nueva.
+  if (!interp.fecha_vencimiento) {
+    return `${base}\n\n📅 ¿Para cuándo es? Dime la fecha de vencimiento (o *sin fecha* si no aplica).`;
+  }
+  return `${base} | vence ${interp.fecha_vencimiento}`;
 }
 
 /** Fecha de hoy en YYYY-MM-DD (default cuando el movimiento no trae fecha). */

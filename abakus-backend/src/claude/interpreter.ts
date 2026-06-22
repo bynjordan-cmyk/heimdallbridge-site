@@ -190,18 +190,23 @@ export async function interpretar(
 
   const perfil = contexto?.perfil ?? '';
 
-  // Historial real de la conversación (turnos previos) para entender mensajes de
-  // seguimiento sin perder el hilo. Se pasa como mensajes de verdad.
-  const previos = (contexto?.historial ?? []).map((t) => ({
-    role: t.role,
-    content: t.text,
-  }));
+  // Historial de la conversación como BLOQUE DE TEXTO en el system prompt. Lo
+  // pasamos así (y no como mensajes multi-turno) porque mezclar turnos de
+  // assistant en texto plano con structured outputs (JSON Schema) puede hacer
+  // que el modelo devuelva respuestas vacías. Solo contiene turnos reales, así
+  // que no filtra datos de registros viejos.
+  const hist = contexto?.historial ?? [];
+  const historialTexto = hist.length > 0
+    ? `\n\nCONVERSACIÓN RECIENTE (úsala para entender mensajes de seguimiento; NO reinventes montos ni datos de turnos viejos):\n${hist
+        .map((t) => `${t.role === 'user' ? 'Usuario' : 'Abakus'}: ${t.text}`)
+        .join('\n')}`
+    : '';
 
   const response = await client.messages.create({
     model: config.anthropic.model,
     max_tokens: 1024,
-    system: SYSTEM_PROMPT.replace('${HOY}', hoyISO()) + dato + moneda + cuentas + perfil,
-    messages: [...previos, { role: 'user', content: texto }],
+    system: SYSTEM_PROMPT.replace('${HOY}', hoyISO()) + dato + moneda + cuentas + historialTexto + perfil,
+    messages: [{ role: 'user', content: texto }],
     output_config: { format: { type: 'json_schema', schema: SCHEMA } },
   });
 
