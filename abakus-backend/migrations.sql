@@ -47,3 +47,10 @@ ALTER TABLE usuarios   ADD COLUMN IF NOT EXISTS pendiente jsonb;
 
 -- 5) Ventana de 24h: hora del último mensaje entrante (tip diario / recordatorios)
 ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS ultimo_mensaje_at timestamptz;
+
+-- 6) Tareas diarias: marca por día para envíos confiables (auto-recuperación si
+--    Railway reinicia/duerme y se pierde el cron). Clave=nombre, valor=fecha.
+CREATE TABLE IF NOT EXISTS tareas_diarias (
+  nombre text PRIMARY KEY,
+  fecha  date NOT NULL
+);

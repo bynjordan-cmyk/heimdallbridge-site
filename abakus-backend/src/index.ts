@@ -4,8 +4,8 @@ import { config } from './config';
 import { verifyWebhook } from './webhook/verify';
 import { handleWebhook } from './webhook/handler';
 import { handleMercadoPagoWebhook } from './webhook/mercadopago';
-import { enviarRecordatorios } from './tasks/recordatorios';
 import { enviarTipDiario } from './tasks/tips';
+import { correrTareasPendientes } from './tasks/scheduler';
 import { generarReporteAprendizaje, renderHtmlAprendizaje } from './admin/reporteAprendizaje';
 
 const app = express();
@@ -75,28 +75,16 @@ app.get('/gracias', (_req, res) => {
   );
 });
 
-// Recordatorios de cobro: se ejecuta todos los días a las 9 AM hora de Santiago.
-cron.schedule(
-  '0 9 * * *',
-  () => {
-    void enviarRecordatorios().catch((err) =>
-      console.error('[abakus][cron] Error en recordatorios:', err),
-    );
-  },
-  { timezone: 'America/Santiago' },
-);
-
-// "Sabías que..." diario: tip/dato financiero a las 15:00 hora de Santiago.
-cron.schedule(
-  '0 15 * * *',
-  () => {
-    void enviarTipDiario().catch((err) =>
-      console.error('[abakus][cron] Error en tip diario:', err),
-    );
-  },
-  { timezone: 'America/Santiago' },
-);
+// Tareas diarias (recordatorios 9 AM, tip 15:00, hora Santiago). El cron es el
+// disparo principal; correrTareasPendientes() marca por día para no duplicar.
+// La confiabilidad real la dan, además, el catch-up al arrancar y el disparo en
+// cada mensaje entrante (ver tasks/scheduler.ts), por si Railway reinició/durmió.
+cron.schedule('0 9,15 * * *', () => void correrTareasPendientes(), {
+  timezone: 'America/Santiago',
+});
 
 app.listen(config.port, () => {
   console.log(`🧮 Abakus escuchando en puerto ${config.port} (${config.webhookPath}) · versión ${VERSION}`);
+  // Catch-up: si el proceso arrancó después de la hora de una tarea no enviada hoy.
+  void correrTareasPendientes();
 });

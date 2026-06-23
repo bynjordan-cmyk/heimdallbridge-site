@@ -5,6 +5,7 @@ import { getUsuarioByPhone, updateUsuario, agregarAprendizaje, touchUltimoMensaj
 import { interpretar } from '../claude/interpreter';
 import { construirPerfil } from '../aprendizaje/perfil';
 import { historial, registrarTurno } from '../utils/contexto';
+import { correrTareasPendientes } from '../tasks/scheduler';
 import { esMonedaSoportada, formatMonto } from '../utils/format';
 import { sendText } from '../whatsapp/sender';
 import { enOnboarding, iniciarOnboarding, invitacionPrimerRegistro } from '../flows/onboarding';
@@ -154,6 +155,10 @@ async function procesar(mensaje: MensajeEntrante): Promise<void> {
   // Marca la ventana de 24h (mensajes proactivos: tip diario, recordatorios).
   // Fire-and-forget: no debe bloquear ni romper el procesamiento del mensaje.
   void touchUltimoMensaje(mensaje.phone);
+
+  // Auto-recuperación de tareas diarias: si Railway reinició/durmió y se perdió el
+  // cron de las 9/15h, al despertar con este mensaje se envían si están pendientes.
+  void correrTareasPendientes();
 
   // Flujo de suscripción: email → plan → link de pago.
   if (esperandoEmail(usuario)) {

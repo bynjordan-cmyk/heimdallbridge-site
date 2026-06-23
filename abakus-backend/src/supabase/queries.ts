@@ -686,6 +686,37 @@ export async function touchUltimoMensaje(phone: string): Promise<void> {
   }
 }
 
+/**
+ * ¿Ya corrió hoy la tarea diaria `nombre`? Usa la tabla `tareas_diarias`
+ * (clave `nombre`, valor `fecha`). Tolerante: si la tabla no existe, devuelve
+ * false (no bloquea; el cron sigue siendo el disparo principal).
+ */
+export async function tareaCorrioHoy(nombre: string, hoy: string): Promise<boolean> {
+  try {
+    const { data, error } = await supabase
+      .from('tareas_diarias')
+      .select('fecha')
+      .eq('nombre', nombre)
+      .maybeSingle();
+    if (error) {
+      if (esEsquemaFaltante(error)) return false;
+      throw error;
+    }
+    return (data as { fecha: string } | null)?.fecha === hoy;
+  } catch (err) {
+    if (esEsquemaFaltante(err as { code?: string; message?: string })) return false;
+    throw err;
+  }
+}
+
+/** Marca la tarea diaria `nombre` como corrida en `hoy` (upsert). Tolerante. */
+export async function marcarTareaCorrida(nombre: string, hoy: string): Promise<void> {
+  const { error } = await supabase.from('tareas_diarias').upsert({ nombre, fecha: hoy });
+  if (error && !esEsquemaFaltante(error)) {
+    console.error('[abakus] No se pudo marcar tarea diaria:', error);
+  }
+}
+
 /** Cuentas pendientes con vencimiento dentro de N días, sin recordatorio enviado. */
 export async function getCuentasPorVencer(
   userPhone: string,
