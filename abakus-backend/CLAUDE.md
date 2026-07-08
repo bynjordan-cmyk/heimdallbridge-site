@@ -313,6 +313,11 @@ Modelo de cuentas por usuario para llevar saldos reales.
   respuesta lo registra. Una cuenta por mensaje.
 - **Transferencias** (`transferencia`): "transferí 50000 de Banco Estado a
   Caja" → no es ingreso ni egreso; ajusta ambos saldos.
+- **Retiro de efectivo:** "saqué/retiré 10000 de la cuenta Rut" (sin decir en qué
+  lo gastó) = transferencia de esa cuenta a "Efectivo", NO un egreso (mover plata
+  al bolsillo no baja el patrimonio). `handleTransferencia` crea la cuenta
+  destino al vuelo si es caja/efectivo y no existe. Alias chileno: "cuenta Rut" →
+  Banco Estado (lo mapea el interpreter).
 - **Comando `cuentas`** (`flows/cuentas.ts`): lista saldos por cuenta + total.
 - **Compatibilidad:** la obligación de mencionar cuenta solo se activa cuando el
   usuario tiene ≥1 cuenta. Los usuarios sin cuentas siguen igual que antes

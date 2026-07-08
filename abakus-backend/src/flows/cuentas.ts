@@ -57,13 +57,28 @@ export async function handleTransferencia(
     return 'Dime desde y hacia qué cuenta. Por ejemplo: "transferí 50000 de Banco Estado a Caja".';
   }
 
-  const [origen, destino] = await Promise.all([
+  const [origen, destinoExistente] = await Promise.all([
     buscarCuenta(user.phone, nombreOrigen),
     buscarCuenta(user.phone, nombreDestino),
   ]);
 
   if (!origen) return cuentaNoEncontrada(user, nombreOrigen);
-  if (!destino) return cuentaNoEncontrada(user, nombreDestino);
+
+  // Retiro de efectivo: si el destino no existe pero es una caja/efectivo, la
+  // creamos al vuelo (caso "saqué 10000 del banco" → transferencia a Efectivo).
+  // Para destinos tipo banco que no existen, mejor preguntar (evita crear por typo).
+  let destino = destinoExistente;
+  let destinoCreado = false;
+  if (!destino) {
+    if (tipoDesdeNombre(nombreDestino) === 'caja') {
+      const creada = await crearCuenta(user.phone, nombreDestino, 'caja', 0);
+      destino = creada.cuenta;
+      destinoCreado = !creada.actualizada;
+    } else {
+      return cuentaNoEncontrada(user, nombreDestino);
+    }
+  }
+
   if (origen.id === destino.id) return 'La cuenta de origen y destino son la misma 🤔';
 
   await insertTransferencia(user.phone, origen.id, destino.id, monto);
@@ -71,8 +86,9 @@ export async function handleTransferencia(
   const saldos = await getSaldosCuentas(user.phone);
   const so = saldos.find((c) => c.id === origen.id);
   const sd = saldos.find((c) => c.id === destino.id);
+  const nota = destinoCreado ? ` _(creada)_` : '';
 
-  return `🔁 Transferencia registrada\n${f(monto)}: *${origen.nombre}* → *${destino.nombre}*` +
+  return `🔁 Transferencia registrada\n${f(monto)}: *${origen.nombre}* → *${destino.nombre}*${nota}` +
     (so && sd ? `\n\n${origen.nombre}: ${f(so.saldo)}\n${destino.nombre}: ${f(sd.saldo)}` : '');
 }
 
