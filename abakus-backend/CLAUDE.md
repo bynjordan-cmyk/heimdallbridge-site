@@ -302,6 +302,25 @@ Modelo de cuentas por usuario para llevar saldos reales.
 > ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS pendiente jsonb;
 > ```
 
+## Panel de control (`GET /admin`)
+
+`GET /admin?key=ADMIN_KEY` (`src/admin/panel.ts` + `src/admin/acciones.ts`) es el
+panel de administración con **dashboard + gestión de usuarios**:
+
+- **Dashboard:** usuarios totales · activos · en prueba (y vencidas) · de pago ·
+  movimientos · % clasificación · cuentas.
+- **Tabla de usuarios** con buscador (nombre/teléfono/negocio/plan) y acciones
+  inline por usuario:
+  - **Cambiar plan** → gratis / básico / pro / premium (`cambiarPlan`; pago ⇒ `activo=true`).
+  - **Extender prueba** → +7 / +30 días (`extenderPrueba`; nunca acorta, reactiva).
+  - **Activar / desactivar** (`setActivo`).
+  - **Ver detalle** → modal con resumen del mes, cuentas y saldos, últimos
+    movimientos y memoria aprendida (`detalleUsuarioHtml`).
+- **Seguridad:** las mutaciones entran por `POST /admin/api/accion` validando
+  `ADMIN_KEY` en el body (no en la URL, para no filtrarla en logs). El detalle
+  por `GET /admin/api/usuario`. Aislado de `queries.ts` (consulta directa a
+  Supabase); no toca el flujo de WhatsApp.
+
 ## Panel admin: salud del aprendizaje
 
 `GET /admin/aprendizaje?key=ADMIN_KEY` (`src/admin/reporteAprendizaje.ts`)
@@ -312,6 +331,7 @@ los últimos usuarios con lo aprendido (teléfono enmascarado por privacidad).
 
 - Protegido por `ADMIN_KEY` (env). Si está vacío, el endpoint responde 404.
 - Solo lectura; aislado de `queries.ts` (consulta directa a Supabase).
+- El panel de control (`/admin`) enlaza a este como vista complementaria.
 
 ## Tareas programadas (cron, zona America/Santiago)
 

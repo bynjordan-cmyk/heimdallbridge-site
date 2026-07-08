@@ -7,6 +7,8 @@ import { handleMercadoPagoWebhook } from './webhook/mercadopago';
 import { enviarTipDiario } from './tasks/tips';
 import { correrTareasPendientes } from './tasks/scheduler';
 import { generarReporteAprendizaje, renderHtmlAprendizaje } from './admin/reporteAprendizaje';
+import { reunirDatosPanel, renderPanel } from './admin/panel';
+import { ejecutarAccion, detalleUsuarioHtml } from './admin/acciones';
 
 const app = express();
 app.use(express.json());
@@ -62,6 +64,58 @@ app.get('/admin/enviar-tip', (req, res) => {
     .catch((err) => {
       console.error('[abakus][admin] Error enviando tip:', err);
       res.status(500).json({ ok: false, error: 'Error enviando tip' });
+    });
+});
+
+// ===== Panel de control (GET /admin) =====
+// Vista de administración con dashboard + gestión de usuarios. Protegido por
+// ADMIN_KEY. Las mutaciones entran por POST /admin/api/accion validando la clave
+// en el body (no en la URL, para no filtrarla en logs).
+
+/** Valida ADMIN_KEY. Devuelve true si respondió (404/403); el caller corta. */
+function bloqueaAdmin(clave: unknown, res: express.Response): boolean {
+  if (!config.adminKey) {
+    res.status(404).send('Not found');
+    return true;
+  }
+  if (clave !== config.adminKey) {
+    res.status(403).send('Forbidden');
+    return true;
+  }
+  return false;
+}
+
+app.get('/admin', (req, res) => {
+  if (bloqueaAdmin(req.query.key, res)) return;
+  void reunirDatosPanel()
+    .then((datos) => res.send(renderPanel(datos, String(req.query.key))))
+    .catch((err) => {
+      console.error('[abakus][admin] Error armando panel:', err);
+      res.status(500).send('Error armando el panel');
+    });
+});
+
+// Detalle de un usuario (fragmento HTML para el modal del panel).
+app.get('/admin/api/usuario', (req, res) => {
+  if (bloqueaAdmin(req.query.key, res)) return;
+  const phone = String(req.query.phone ?? '');
+  void detalleUsuarioHtml(phone)
+    .then((html) => res.send(html))
+    .catch((err) => {
+      console.error('[abakus][admin] Error en detalle:', err);
+      res.status(500).send('<p>Error cargando el detalle.</p>');
+    });
+});
+
+// Acción sobre un usuario (cambiar plan, extender prueba, activar/desactivar).
+app.post('/admin/api/accion', (req, res) => {
+  const body = (req.body ?? {}) as { key?: unknown; phone?: unknown; accion?: unknown; valor?: unknown };
+  if (bloqueaAdmin(body.key, res)) return;
+  void ejecutarAccion(String(body.accion ?? ''), String(body.phone ?? ''), String(body.valor ?? ''))
+    .then((r) => res.json(r))
+    .catch((err) => {
+      console.error('[abakus][admin] Error ejecutando acción:', err);
+      res.status(500).json({ ok: false, mensaje: 'Error ejecutando la acción' });
     });
 });
 
