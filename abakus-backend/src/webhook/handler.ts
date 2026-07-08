@@ -54,6 +54,7 @@ import {
   iniciarReinicio,
   procesarConfirmacionReinicio,
 } from '../flows/reinicio';
+import { esperandoReporte, iniciarReporte, procesarReporte } from '../flows/reporteBug';
 
 const ERROR_GENERICO = 'Ups, algo salió mal 😅 Intenta de nuevo en un momento.';
 const ERROR_CUENTAS_NO_DISP =
@@ -185,6 +186,14 @@ async function procesar(mensaje: MensajeEntrante): Promise<void> {
     return;
   }
 
+  // El usuario está escribiendo el detalle de un reporte de bug. Interceptar
+  // antes de comandos/Claude para no interpretar su texto como otra cosa.
+  if (esperandoReporte(usuario)) {
+    const respuesta = await procesarReporte(usuario, mensaje.texto);
+    await sendText(mensaje.phone, respuesta);
+    return;
+  }
+
   // Esperando que el usuario indique a qué cuenta van movimientos pendientes.
   if (esperandoCuenta(usuario)) {
     const resuelto = await resolverCuentaPendiente(usuario, mensaje.texto);
@@ -300,6 +309,11 @@ async function procesar(mensaje: MensajeEntrante): Promise<void> {
   if (comando === 'reiniciar') {
     // Paso 1 de "empezar de cero": avisa qué se borrará y pide CONFIRMAR.
     await sendText(mensaje.phone, await iniciarReinicio(usuario));
+    return;
+  }
+  if (comando === 'reportar') {
+    // Reporte de bug/soporte: captura el detalle (inline o preguntando) y avisa al equipo.
+    await sendText(mensaje.phone, await iniciarReporte(usuario, mensaje.texto));
     return;
   }
   if (comando === 'eliminar') {

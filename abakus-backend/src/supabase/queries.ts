@@ -840,6 +840,30 @@ export async function eliminarMovimiento(
   return mov;
 }
 
+/**
+ * Guarda un reporte de bug/soporte enviado por un usuario. Tolera que la tabla
+ * `reportes` aún no exista (loguea y sigue): el aviso por WhatsApp al equipo no
+ * depende de esto.
+ */
+export async function insertReporte(input: {
+  userPhone: string;
+  nombre: string | null;
+  mensaje: string;
+  version: string;
+}): Promise<void> {
+  try {
+    const { error } = await supabase.from('reportes').insert({
+      user_phone: input.userPhone,
+      nombre: input.nombre,
+      mensaje: input.mensaje,
+      version: input.version,
+    });
+    if (error) throw error;
+  } catch (e) {
+    console.error('[abakus][reporte] No se pudo guardar el reporte:', e);
+  }
+}
+
 /** Cuenta cuántos datos tiene el usuario (para avisar antes de un reinicio). */
 export async function contarDatosUsuario(
   userPhone: string,

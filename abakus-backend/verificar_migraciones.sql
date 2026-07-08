@@ -17,7 +17,8 @@ WITH esperado(objeto, tabla, columna) AS (VALUES
   -- Tablas nuevas
   ('tabla',   'cuentas',        NULL),              -- bancos/caja con saldo inicial
   ('tabla',   'transferencias', NULL),              -- traspasos entre cuentas
-  ('tabla',   'tareas_diarias', NULL)               -- marca de envíos diarios
+  ('tabla',   'tareas_diarias', NULL),              -- marca de envíos diarios
+  ('tabla',   'reportes',        NULL)              -- reportes de bug/soporte
 )
 SELECT
   e.tabla || COALESCE('.' || e.columna, '') AS item,

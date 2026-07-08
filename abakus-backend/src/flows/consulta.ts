@@ -10,7 +10,7 @@ import {
   periodoMesesAtras,
 } from '../reports/periodo';
 
-export type ComandoEspecial = 'resumen' | 'detalle' | 'cobros' | 'porpagar' | 'cuentas' | 'ayuda' | 'pago' | 'planes' | 'reporte' | 'eliminar' | 'comparar' | 'meta' | 'proyeccion' | 'plantilla' | 'reiniciar';
+export type ComandoEspecial = 'resumen' | 'detalle' | 'cobros' | 'porpagar' | 'cuentas' | 'ayuda' | 'pago' | 'planes' | 'reporte' | 'eliminar' | 'comparar' | 'meta' | 'proyeccion' | 'plantilla' | 'reiniciar' | 'reportar';
 
 const MESES_ES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 const tieneMes = (s: string) => MESES_ES.some((m) => s.includes(m));
@@ -49,6 +49,15 @@ export function detectarComando(texto: string): ComandoEspecial | null {
       t.includes('tiene costo') || t.includes('es pago') || t.includes('es gratis')
     ))
   ) return 'planes';
+  // Reporte de bug / soporte. Se evalúa ANTES que 'reporte' (Excel) para que
+  // "reportar", "reporte de bug" o "tengo un problema" caigan aquí, no en Excel.
+  if (
+    t === 'reportar' || t.startsWith('reportar') ||
+    t === 'soporte' || t === 'contactar soporte' || t === 'ayuda soporte' ||
+    t.includes('bug') ||
+    t.includes('tengo un problema') || t.includes('tengo un error') ||
+    t.includes('quiero reportar') || t.includes('reportar falla')
+  ) return 'reportar';
   // Detalle EN EL CHAT (texto), no Excel. Se evalúa ANTES que 'reporte' para que
   // frases como "no lo quiero en excel, muéstrame en el chat" no caigan en Excel.
   if (
@@ -106,6 +115,7 @@ const AYUDA = `🧮 *Abakus* — esto es lo que puedo hacer:
 • *plantilla* → descarga un Excel para cargar varios movimientos de una vez. Complétalo y reenvíamelo por aquí.
 • *planes* → ver los planes y precios · *suscribirme* → activar tu plan.
 • *empezar de cero* → borra todos tus datos y arranca limpio (pide confirmación).
+• *reportar* → ¿algo falló o tienes una sugerencia? Cuéntame y lo mandamos al equipo.
 
 ¿En qué te ayudo?`;
 

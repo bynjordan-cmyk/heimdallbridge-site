@@ -54,3 +54,14 @@ CREATE TABLE IF NOT EXISTS tareas_diarias (
   nombre text PRIMARY KEY,
   fecha  date NOT NULL
 );
+
+-- 7) Reportes de bug/soporte enviados por los usuarios desde WhatsApp ----------
+CREATE TABLE IF NOT EXISTS reportes (
+  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_phone text,
+  nombre     text,
+  mensaje    text NOT NULL,
+  version    text,                       -- commit desplegado cuando se reportó
+  estado     text DEFAULT 'nuevo',       -- nuevo | visto | resuelto
+  created_at timestamptz DEFAULT now()
+);

@@ -41,4 +41,10 @@ export const config = {
   // Clave para el panel de administración (/admin/*). Si está vacía, el panel
   // queda deshabilitado.
   adminKey: (process.env.ADMIN_KEY ?? '').trim(),
+  // Número (E.164, ej. +56912345678) que recibe por WhatsApp los reportes de bug
+  // de los usuarios. Vacío = no se envía aviso (el reporte igual queda guardado).
+  adminPhone: (process.env.ADMIN_PHONE ?? '').trim(),
+  // Commit desplegado (Railway lo expone). Se adjunta a los reportes de bug para
+  // saber en qué versión ocurrió.
+  version: (process.env.RAILWAY_GIT_COMMIT_SHA ?? 'dev').slice(0, 7),
 } as const;

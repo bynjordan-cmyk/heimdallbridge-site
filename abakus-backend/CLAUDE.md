@@ -241,6 +241,23 @@ abakus-backend/
 - `plantilla` → envía un Excel (.xlsx) de plantilla para carga masiva
 - `empezar de cero` / `reiniciar` / `borrar todo` / `cuenta nueva` → borrón y
   cuenta nueva (ver *Empezar de cero*)
+- `reportar` / `tengo un problema` / `soporte` → reporte de bug (ver *Reportes*)
+
+### Reportes de bug / soporte
+
+Comando `reportar` (`flows/reporteBug.ts`): el usuario cuenta un problema o
+sugerencia y Abakus lo **guarda** en la tabla `reportes` y lo **reenvía por
+WhatsApp** al equipo (`config.adminPhone`).
+
+- Si el mensaje ya trae el detalle ("reportar el #7 no aparece"), se registra
+  directo; si es solo "reportar", pide el detalle (estado `reportando_bug`).
+- El aviso al equipo incluye quién reportó y la **versión desplegada**
+  (`config.version` = `RAILWAY_GIT_COMMIT_SHA`), para reproducir el bug.
+- `insertReporte` tolera que la tabla `reportes` no exista (loguea y sigue); el
+  aviso por WhatsApp no depende de la tabla.
+- Config: `ADMIN_PHONE` (E.164) define el destinatario. Vacío = no se envía el
+  aviso, pero el reporte igual queda guardado. Migración: tabla `reportes` (ver
+  `migrations.sql`, ítem 7).
 
 ### Empezar de cero (borrón y cuenta nueva)
 
