@@ -37,6 +37,14 @@ import { armarEsperandoCategoria, PREGUNTA_CATEGORIA } from './clasificacion';
 
 const LIMITE_CUENTAS_BASICO = 3;
 
+/**
+ * Mensaje reencauzador: cuando una corrección no se puede aplicar (no hay a qué
+ * movimiento apuntar o no se detectó el cambio), en vez de dejar al usuario en un
+ * callejón sin salida, le damos caminos concretos para seguir.
+ */
+const REENCAUZA =
+  'Puedes:\n• Decirme el nuevo valor: "el monto eran 3000"\n• Apuntar a uno por su número: "corrige el #4 a transporte"\n• Escribir *detalle* para ver tus movimientos con su número\n• O contarme un movimiento nuevo y lo registro 👍';
+
 export async function handleRegistro(
   user: Usuario,
   interp: Interpretacion,
@@ -129,8 +137,8 @@ export async function handleRegistro(
 
     if (!res) {
       return interp.referencia != null
-        ? `No encontré el movimiento #${interp.referencia} 🤔`
-        : 'No encontré un movimiento reciente para corregir 🤔 ¿Quieres registrar uno nuevo?';
+        ? `No encontré el movimiento #${interp.referencia} 🤔\n${REENCAUZA}`
+        : `No encontré un movimiento reciente para corregir 🤔\n${REENCAUZA}`;
     }
 
     const { anterior, actualizado } = res;
@@ -153,7 +161,7 @@ export async function handleRegistro(
     }
 
     if (cambios.length === 0) {
-      return 'No detecté qué cambiar 🤔 Dime el nuevo valor, por ejemplo: "el monto eran 3000".';
+      return `Mmm, no pillé qué querías ajustar 🤔\n${REENCAUZA}`;
     }
 
     const emoji = actualizado.tipo === 'ingreso' ? '💰' : '💸';
