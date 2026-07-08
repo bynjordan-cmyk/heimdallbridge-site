@@ -239,6 +239,28 @@ abakus-backend/
 - `por pagar` / `mis deudas` / `qué debo` → cuentas por pagar pendientes (lo que debes)
 - `ayuda` → menú de comandos
 - `plantilla` → envía un Excel (.xlsx) de plantilla para carga masiva
+- `empezar de cero` / `reiniciar` / `borrar todo` / `cuenta nueva` → borrón y
+  cuenta nueva (ver *Empezar de cero*)
+
+### Empezar de cero (borrón y cuenta nueva)
+
+Comando `reiniciar` (`flows/reinicio.ts`) con **confirmación doble** (irreversible):
+
+1. **Paso 1** (`iniciarReinicio`): cuenta cuántos datos tiene el usuario, avisa
+   qué se borrará y lo deja en `estado_conversacion = 'confirmar_reinicio'`. Si no
+   tiene nada, no arma el estado.
+2. **Paso 2** (`procesarConfirmacionReinicio`, interceptado en el handler antes de
+   comandos/Claude): solo si el texto es *CONFIRMAR* ejecuta `reiniciarCuenta`;
+   cualquier otra cosa cancela. Siempre limpia el estado (no deja atrapado).
+
+`reiniciarCuenta` (`queries.ts`) borra `movimientos`, `cuentas`,
+`transferencias` y `cuentas_pendientes` del usuario, y **conserva** su fila en
+`usuarios` (plan, suscripción, moneda, negocio, tono, memoria). Además limpia el
+historial conversacional y `pendiente`. Tolera tablas ausentes.
+
+El detector (`detectarComando`) exige frases explícitas ("todo", "de cero",
+"cuenta nueva", "reiniciar", "reset") para no chocar con "borra el #5"
+(eliminar un solo movimiento).
 
 ### Cuentas por cobrar vs por pagar
 

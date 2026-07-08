@@ -10,7 +10,7 @@ import {
   periodoMesesAtras,
 } from '../reports/periodo';
 
-export type ComandoEspecial = 'resumen' | 'detalle' | 'cobros' | 'porpagar' | 'cuentas' | 'ayuda' | 'pago' | 'planes' | 'reporte' | 'eliminar' | 'comparar' | 'meta' | 'proyeccion' | 'plantilla';
+export type ComandoEspecial = 'resumen' | 'detalle' | 'cobros' | 'porpagar' | 'cuentas' | 'ayuda' | 'pago' | 'planes' | 'reporte' | 'eliminar' | 'comparar' | 'meta' | 'proyeccion' | 'plantilla' | 'reiniciar';
 
 const MESES_ES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 const tieneMes = (s: string) => MESES_ES.some((m) => s.includes(m));
@@ -69,6 +69,16 @@ export function detectarComando(texto: string): ComandoEspecial | null {
     t.includes('excel') || t.includes('reporte') || t.includes('informe')
   ) return 'reporte';
   if (t === 'deshacer' || t === 'undo' || t === 'borra el último' || t === 'borrar último' || t === 'eliminar último') return 'eliminar';
+  // Empezar de cero (borrón y cuenta nueva). Requiere frases explícitas de
+  // "todo/de cero/cuenta nueva" para no chocar con "borra el #5" (eliminar uno).
+  if (
+    t === 'reiniciar' || t === 'reinicia' || t === 'reiniciar cuenta' || t === 'reiniciar todo' ||
+    t === 'reset' || t === 'resetear' ||
+    t === 'cuenta nueva' || t === 'borron y cuenta nueva' || t === 'borrón y cuenta nueva' ||
+    t.includes('empezar de cero') || t.includes('empezar de nuevo') || t.includes('comenzar de cero') ||
+    t === 'borrar todo' || t === 'borra todo' || t.includes('borrar todo') ||
+    t.includes('borrar todos mis movimientos') || t.includes('borrar mis datos') || t.includes('borra mis datos')
+  ) return 'reiniciar';
   if (t === 'comparar' || t === 'comparativo' || t === 'tendencia' || t.includes('vs el mes') || t.includes('mes pasado')) return 'comparar';
   if (t.includes('proyec')) return 'proyeccion';
   if (t === 'meta' || t.startsWith('meta ') || t === 'objetivo' || t.startsWith('objetivo ') || t.startsWith('mi meta')) return 'meta';
@@ -95,6 +105,7 @@ const AYUDA = `🧮 *Abakus* — esto es lo que puedo hacer:
 • Cuéntame una deuda: "Juan me debe 30000 para el 30/06".
 • *plantilla* → descarga un Excel para cargar varios movimientos de una vez. Complétalo y reenvíamelo por aquí.
 • *planes* → ver los planes y precios · *suscribirme* → activar tu plan.
+• *empezar de cero* → borra todos tus datos y arranca limpio (pide confirmación).
 
 ¿En qué te ayudo?`;
 

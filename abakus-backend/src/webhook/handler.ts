@@ -49,6 +49,11 @@ import {
   procesarEmailSuscripcion,
   procesarSeleccionPlan,
 } from '../flows/suscripcion';
+import {
+  esperandoConfirmacionReinicio,
+  iniciarReinicio,
+  procesarConfirmacionReinicio,
+} from '../flows/reinicio';
 
 const ERROR_GENERICO = 'Ups, algo salió mal 😅 Intenta de nuevo en un momento.';
 const ERROR_CUENTAS_NO_DISP =
@@ -172,6 +177,14 @@ async function procesar(mensaje: MensajeEntrante): Promise<void> {
     return;
   }
 
+  // Confirmación de "empezar de cero" (borrón y cuenta nueva). Alta prioridad:
+  // debe interceptarse antes de comandos/Claude para que solo CONFIRMAR ejecute.
+  if (esperandoConfirmacionReinicio(usuario)) {
+    const respuesta = await procesarConfirmacionReinicio(usuario, mensaje.texto);
+    await sendText(mensaje.phone, respuesta);
+    return;
+  }
+
   // Esperando que el usuario indique a qué cuenta van movimientos pendientes.
   if (esperandoCuenta(usuario)) {
     const resuelto = await resolverCuentaPendiente(usuario, mensaje.texto);
@@ -282,6 +295,11 @@ async function procesar(mensaje: MensajeEntrante): Promise<void> {
   }
   if (comando === 'cuentas') {
     await sendText(mensaje.phone, await handleListarCuentas(usuario));
+    return;
+  }
+  if (comando === 'reiniciar') {
+    // Paso 1 de "empezar de cero": avisa qué se borrará y pide CONFIRMAR.
+    await sendText(mensaje.phone, await iniciarReinicio(usuario));
     return;
   }
   if (comando === 'eliminar') {

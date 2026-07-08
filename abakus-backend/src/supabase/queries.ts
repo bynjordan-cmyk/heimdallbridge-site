@@ -839,3 +839,62 @@ export async function eliminarMovimiento(
   if (delError) throw delError;
   return mov;
 }
+
+/** Cuenta cuántos datos tiene el usuario (para avisar antes de un reinicio). */
+export async function contarDatosUsuario(
+  userPhone: string,
+): Promise<{ movimientos: number; cuentas: number; pendientes: number }> {
+  const contar = async (tabla: string): Promise<number> => {
+    try {
+      const { count, error } = await supabase
+        .from(tabla)
+        .select('id', { count: 'exact', head: true })
+        .eq('user_phone', userPhone);
+      if (error) throw error;
+      return count ?? 0;
+    } catch {
+      return 0;
+    }
+  };
+  const [movimientos, cuentas, pendientes] = await Promise.all([
+    contar('movimientos'),
+    contar('cuentas'),
+    contar('cuentas_pendientes'),
+  ]);
+  return { movimientos, cuentas, pendientes };
+}
+
+/**
+ * Borrón y cuenta nueva: elimina movimientos, cuentas, transferencias y cuentas
+ * por cobrar/pagar del usuario. NO toca la fila de `usuarios` (conserva plan,
+ * suscripción, moneda y aprendizaje). Devuelve cuántos registros borró por
+ * tabla. Tolera tablas ausentes (degrada sin romper el flujo).
+ */
+export async function reiniciarCuenta(userPhone: string): Promise<{
+  movimientos: number;
+  cuentas: number;
+  transferencias: number;
+  pendientes: number;
+}> {
+  const borrar = async (tabla: string): Promise<number> => {
+    try {
+      const { data, error } = await supabase
+        .from(tabla)
+        .delete()
+        .eq('user_phone', userPhone)
+        .select('id');
+      if (error) throw error;
+      return data?.length ?? 0;
+    } catch (e) {
+      console.error(`[abakus][reinicio] No se pudo limpiar ${tabla}:`, e);
+      return 0;
+    }
+  };
+  const [movimientos, cuentas, transferencias, pendientes] = await Promise.all([
+    borrar('movimientos'),
+    borrar('cuentas'),
+    borrar('transferencias'),
+    borrar('cuentas_pendientes'),
+  ]);
+  return { movimientos, cuentas, transferencias, pendientes };
+}
