@@ -338,14 +338,17 @@ export function esSinClasificar(categoria: string | null): boolean {
   return c === '' || c === 'sin clasificar';
 }
 
-const TIPS_IVA = [
-  '💡 _Tip: Recuerda apartar ~10% para retención de honorarios (SII)._',
-  '💡 _Tip: ¿Ya tienes apartado para el IVA de este mes? Un 19% sobre tus ingresos afectos te ayuda a no sorprenderte._',
-  '💡 _Tip: Con buenos ingresos, considera guardar al menos un 10-15% en una cuenta separada para obligaciones tributarias._',
+// Recordatorios fiscales GENÉRICOS (sin porcentajes ni regímenes: no todos son
+// honorarios y dar cifras sería casi asesoría). Solo un empujón amable a apartar
+// para las obligaciones fiscales, en ingresos grandes.
+const RECORDATORIOS_FISCALES = [
+  '💡 _No olvides tus obligaciones fiscales: aparta una parte de este ingreso en una cuenta separada y evita el susto anual._',
+  '💡 _Buen ingreso 🙌 Acuérdate de reservar algo para tus impuestos — tu yo del futuro te lo agradecerá._',
+  '💡 _Tip: separa desde ya lo que va para tus obligaciones fiscales; en la temporada de impuestos se nota la diferencia._',
 ];
 
 function tipIngreso(monto: number): string {
   if (monto < 300_000) return '';
-  const tip = TIPS_IVA[Math.floor(Math.random() * TIPS_IVA.length)];
+  const tip = RECORDATORIOS_FISCALES[Math.floor(Math.random() * RECORDATORIOS_FISCALES.length)];
   return `\n\n${tip}`;
 }
