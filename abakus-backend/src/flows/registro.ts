@@ -16,8 +16,20 @@ import {
 } from '../supabase/queries';
 
 /** Etiqueta de correlativo, ej. " #42" (vacío si aún no hay numeración). */
-function refTag(correlativo: number | null): string {
+export function refTag(correlativo: number | null): string {
   return correlativo != null ? ` #${correlativo}` : '';
+}
+
+/**
+ * Etiqueta de rango para varios movimientos, ej. " (#5–#8)". Si es uno solo usa
+ * " #5"; vacío si no hay numeración. Sirve para que el usuario sepa qué números
+ * editar/borrar tras un registro múltiple.
+ */
+export function rangoTag(correlativos: (number | null)[]): string {
+  const nums = correlativos.filter((n): n is number => n != null);
+  if (nums.length === 0) return '';
+  if (nums.length === 1) return ` #${nums[0]}`;
+  return ` (#${nums[0]}–#${nums[nums.length - 1]})`;
 }
 import { formatMonto } from '../utils/format';
 import { mesActual } from '../reports/periodo';
@@ -245,7 +257,8 @@ export async function registrarMovimientos(
   const totalIngresos = ingresos.reduce((s, m) => s + m.monto, 0);
   const totalEgresos = egresos.reduce((s, m) => s + m.monto, 0);
 
-  let msg = `✅ *Registré ${items.length} movimientos*`;
+  const rango = rangoTag(insertados.map((m) => m.correlativo));
+  let msg = `✅ *Registré ${items.length} movimientos*${rango}`;
   if (ingresos.length > 0) msg += `\n💰 Ingresos: ${f(totalIngresos)} (${ingresos.length})`;
   if (egresos.length > 0) msg += `\n💸 Egresos: ${f(totalEgresos)} (${egresos.length})`;
   msg += `\n\nEscribe *resumen* para ver tu balance actualizado.`;

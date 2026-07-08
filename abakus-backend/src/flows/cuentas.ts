@@ -9,7 +9,7 @@ import {
   updateUsuario,
 } from '../supabase/queries';
 import { formatMonto } from '../utils/format';
-import { esSinClasificar } from './registro';
+import { esSinClasificar, rangoTag, refTag } from './registro';
 import { armarEsperandoCategoria, PREGUNTA_CATEGORIA } from './clasificacion';
 
 const ESPERANDO_CUENTA = 'esperando_cuenta';
@@ -176,9 +176,12 @@ export async function registrarPendientesEnCuenta(
 
   const unico = items.length === 1 ? items[0] : null;
   const cat = unico?.categoria ? ` · ${unico.categoria}` : unico ? ' · Sin clasificar' : '';
+  // Muestra el/los número(s) de movimiento (#N) para que el usuario pueda
+  // editarlos o borrarlos ("corrige el #5", "borra el #6").
+  const ref = unico ? refTag(insertados[0]?.correlativo ?? null) : rangoTag(insertados.map((m) => m.correlativo));
   let msg = unico
-    ? `✅ Registrado en *${cuenta.nombre}*\n${unico.tipo === 'ingreso' ? '💰' : '💸'} ${f(unico.monto)}${cat}`
-    : `✅ ${items.length} movimientos en *${cuenta.nombre}*`;
+    ? `✅ Registrado en *${cuenta.nombre}*${ref}\n${unico.tipo === 'ingreso' ? '💰' : '💸'} ${f(unico.monto)}${cat}`
+    : `✅ ${items.length} movimientos en *${cuenta.nombre}*${ref}`;
   if (items.length > 1) {
     if (ingresos > 0) msg += `\n💰 Ingresos: ${f(ingresos)}`;
     if (egresos > 0) msg += `\n💸 Egresos: ${f(egresos)}`;
