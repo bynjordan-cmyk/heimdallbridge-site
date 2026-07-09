@@ -32,8 +32,20 @@ export interface DatosPanel {
     movimientos: number;
     tasaClasificacion: number;
     cuentas: number;
+    reportesNuevos: number;
   };
   usuarios: UsuarioPanel[];
+  reportes: ReportePanel[];
+}
+
+interface ReportePanel {
+  id: string;
+  phone: string | null;
+  nombre: string | null;
+  mensaje: string;
+  version: string | null;
+  estado: string | null;
+  created_at: string | null;
 }
 
 function esPago(plan: string | null | undefined): boolean {
@@ -108,8 +120,34 @@ export async function reunirDatosPanel(): Promise<DatosPanel> {
   const clasificados = Math.max(0, totalMovs - sinClasificar);
   const tasaClasificacion = totalMovs > 0 ? Math.round((clasificados / totalMovs) * 100) : 0;
 
+  // Reportes de bug/soporte (últimos 60). Tolera que la tabla no exista aún.
+  let reportes: ReportePanel[] = [];
+  try {
+    const { data } = await supabase
+      .from('reportes')
+      .select('id, user_phone, nombre, mensaje, version, estado, created_at')
+      .order('created_at', { ascending: false })
+      .limit(60);
+    reportes = (data ?? []).map((r) => {
+      const row = r as Record<string, unknown>;
+      return {
+        id: String(row.id ?? ''),
+        phone: (row.user_phone as string) ?? null,
+        nombre: (row.nombre as string) ?? null,
+        mensaje: String(row.mensaje ?? ''),
+        version: (row.version as string) ?? null,
+        estado: (row.estado as string) ?? 'nuevo',
+        created_at: (row.created_at as string) ?? null,
+      };
+    });
+  } catch {
+    reportes = [];
+  }
+  const reportesNuevos = reportes.filter((r) => (r.estado ?? 'nuevo') === 'nuevo').length;
+
   return {
     generadoEn: new Date().toISOString(),
+    reportes,
     metricas: {
       usuarios: lista.length,
       activos,
@@ -119,6 +157,7 @@ export async function reunirDatosPanel(): Promise<DatosPanel> {
       movimientos: totalMovs,
       tasaClasificacion,
       cuentas: totalCuentas,
+      reportesNuevos,
     },
     usuarios: lista,
   };
@@ -191,6 +230,29 @@ export function renderPanel(d: DatosPanel, key: string): string {
     })
     .join('');
 
+  const badgeEstado = (e: string | null): string => {
+    const s = (e ?? 'nuevo').toLowerCase();
+    const col: Record<string, string> = { nuevo: '#c0392b', visto: '#d68910', resuelto: '#27ae60' };
+    return `<span class="badge" style="background:${col[s] ?? '#7f8c8d'}">${esc(s)}</span>`;
+  };
+  const filasReportes = d.reportes
+    .map((r) => {
+      const quien = r.nombre ? `${r.nombre} · ${r.phone ?? ''}` : (r.phone ?? '—');
+      const fecha = r.created_at ? String(r.created_at).slice(0, 16).replace('T', ' ') : '—';
+      return `<tr data-id="${esc(r.id)}">
+        <td style="white-space:nowrap">${esc(fecha)}</td>
+        <td class="tel">${esc(quien)}</td>
+        <td style="white-space:normal;min-width:280px">${esc(r.mensaje)}</td>
+        <td style="text-align:center">${esc(r.version ?? '—')}</td>
+        <td>${badgeEstado(r.estado)}</td>
+        <td class="acc">
+          <button class="b brep" data-estado="visto" title="Marcar como visto">Visto</button>
+          <button class="b brep bres" data-estado="resuelto" title="Marcar como resuelto">Resuelto</button>
+        </td>
+      </tr>`;
+    })
+    .join('');
+
   return `<!doctype html><html lang="es"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Abakus — Panel de Control</title>
@@ -221,6 +283,8 @@ export function renderPanel(d: DatosPanel, key: string): string {
   .acc select,.b{font-size:12px;border:1px solid #cbd;border-radius:8px;padding:4px 8px;background:#fff;cursor:pointer}
   .b:hover{background:#eef}
   .bver{background:var(--navy);color:#fff;border-color:var(--navy)}
+  .bres{background:#27ae60;color:#fff;border-color:#27ae60}
+  .sec-title{margin:34px 0 10px;color:var(--navy);font-size:18px}
   .tabla-wrap{overflow-x:auto}
   #toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#1a1a1a;color:#fff;padding:12px 20px;border-radius:10px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:60}
   #toast.show{opacity:1}
@@ -250,6 +314,7 @@ export function renderPanel(d: DatosPanel, key: string): string {
     ${tarjeta('Movimientos', String(m.movimientos))}
     ${tarjeta('% Clasificación', m.tasaClasificacion + '%')}
     ${tarjeta('Cuentas', String(m.cuentas))}
+    ${tarjeta('Reportes nuevos', String(m.reportesNuevos), `${d.reportes.length} en total`)}
   </div>
 
   <div class="bar">
@@ -264,6 +329,16 @@ export function renderPanel(d: DatosPanel, key: string): string {
       <th>Moneda</th><th>Movs</th><th>Estado</th><th>Últ. msg</th><th>Acciones</th>
     </tr></thead>
     <tbody>${filas || '<tr><td colspan="10">Sin usuarios.</td></tr>'}</tbody>
+  </table>
+  </div>
+
+  <h2 class="sec-title">🐞 Reportes de usuarios</h2>
+  <div class="tabla-wrap">
+  <table id="tabla-rep">
+    <thead><tr>
+      <th>Fecha</th><th>Usuario</th><th>Mensaje</th><th>Versión</th><th>Estado</th><th>Acciones</th>
+    </tr></thead>
+    <tbody>${filasReportes || '<tr><td colspan="6">Sin reportes todavía.</td></tr>'}</tbody>
   </table>
   </div>
 </main>
@@ -341,6 +416,14 @@ document.querySelectorAll('#tabla tbody tr[data-phone]').forEach((r) => {
     accion(phone, activar ? 'activar' : 'desactivar', '');
   });
   r.querySelector('.bver').addEventListener('click', () => verDetalle(phone));
+});
+
+// Reportes: marcar como visto / resuelto. El id del reporte viaja en el campo "phone".
+document.querySelectorAll('#tabla-rep tbody tr[data-id]').forEach((r) => {
+  const id = r.dataset.id;
+  r.querySelectorAll('.brep').forEach((b) => {
+    b.addEventListener('click', () => accion(id, 'reporte', b.dataset.estado));
+  });
 });
 </script>
 </body></html>`;

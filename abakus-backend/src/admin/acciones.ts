@@ -86,6 +86,16 @@ export async function setActivo(phone: string, activo: boolean): Promise<Resulta
   return { ok: true, mensaje: activo ? 'Usuario activado' : 'Usuario desactivado' };
 }
 
+/** Marca un reporte de bug con un nuevo estado (nuevo | visto | resuelto). */
+export async function marcarReporte(id: string, estado: string): Promise<ResultadoAccion> {
+  if (!['nuevo', 'visto', 'resuelto'].includes(estado)) {
+    return { ok: false, mensaje: `Estado inválido: ${estado}` };
+  }
+  const { error } = await supabase.from('reportes').update({ estado }).eq('id', id);
+  if (error) return { ok: false, mensaje: error.message };
+  return { ok: true, mensaje: `Reporte marcado como ${estado}` };
+}
+
 /** Despacha una acción del panel por su nombre. */
 export async function ejecutarAccion(
   accion: string,
@@ -104,6 +114,9 @@ export async function ejecutarAccion(
       return setActivo(phone, true);
     case 'desactivar':
       return setActivo(phone, false);
+    case 'reporte':
+      // En este caso `phone` transporta el id del reporte y `valor` el nuevo estado.
+      return marcarReporte(phone, valor);
     default:
       return { ok: false, mensaje: `Acción desconocida: ${accion}` };
   }
