@@ -9,6 +9,7 @@ import { correrTareasPendientes } from './tasks/scheduler';
 import { generarReporteAprendizaje, renderHtmlAprendizaje } from './admin/reporteAprendizaje';
 import { reunirDatosPanel, renderPanel } from './admin/panel';
 import { ejecutarAccion, detalleUsuarioHtml } from './admin/acciones';
+import { diagnosticarAviso } from './flows/reporteBug';
 
 const app = express();
 app.use(express.json());
@@ -116,6 +117,19 @@ app.post('/admin/api/accion', (req, res) => {
     .catch((err) => {
       console.error('[abakus][admin] Error ejecutando acción:', err);
       res.status(500).json({ ok: false, mensaje: 'Error ejecutando la acción' });
+    });
+});
+
+// Diagnóstico de avisos: intenta enviar un WhatsApp de prueba a ADMIN_PHONE y
+// devuelve el resultado real (incluido el error de Meta). Para depurar por qué
+// no llegan los avisos de reporte de bug.
+app.get('/admin/test-aviso', (req, res) => {
+  if (bloqueaAdmin(req.query.key, res)) return;
+  void diagnosticarAviso()
+    .then((r) => res.json(r))
+    .catch((err) => {
+      console.error('[abakus][admin] Error en test-aviso:', err);
+      res.status(500).json({ ok: false, detalle: 'Error ejecutando el diagnóstico' });
     });
 });
 

@@ -67,3 +67,28 @@ async function notificarEquipo(user: Usuario, mensaje: string): Promise<void> {
   const aviso = `🐞 *Nuevo reporte de Abakus*\n👤 ${quien}\n🏷️ Versión: ${config.version}\n\n"${mensaje}"`;
   await sendText(config.adminPhone, aviso);
 }
+
+/**
+ * Diagnóstico: intenta enviar un aviso de prueba a ADMIN_PHONE y devuelve el
+ * resultado real (incluido el error de Meta si falla). Sirve para saber por qué
+ * no llegan los avisos de reporte. Se expone en un endpoint admin.
+ */
+export async function diagnosticarAviso(): Promise<{ ok: boolean; adminPhone: string; detalle: string }> {
+  const soloDigitos = config.adminPhone.replace(/\D/g, '');
+  const masked = soloDigitos ? `…${soloDigitos.slice(-4)}` : '(vacío)';
+  if (!config.adminPhone) {
+    return {
+      ok: false,
+      adminPhone: masked,
+      detalle: 'ADMIN_PHONE está vacío en el proceso. Ponlo en Railway → Variables y espera a que redepliegue.',
+    };
+  }
+  try {
+    await sendText(config.adminPhone, '🔔 Prueba de aviso de Abakus. Si ves esto, los reportes te llegarán bien. 🧮');
+    return { ok: true, adminPhone: masked, detalle: 'Envío aceptado por Meta. Revisa tu WhatsApp.' };
+  } catch (e) {
+    const err = e as { response?: { data?: unknown }; message?: string };
+    const metaErr = err.response?.data ? JSON.stringify(err.response.data) : (err.message ?? String(e));
+    return { ok: false, adminPhone: masked, detalle: `Meta rechazó el envío: ${metaErr}` };
+  }
+}
