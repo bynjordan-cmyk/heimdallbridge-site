@@ -1,4 +1,5 @@
 import { supabase } from './client';
+import { config } from '../config';
 import { Cuenta, CuentaConSaldo, CuentaPorCobrar, Movimiento, TipoMovimiento, Usuario } from '../types';
 
 export async function getUsuarioByPhone(phone: string): Promise<Usuario | null> {
@@ -21,6 +22,11 @@ export async function createUsuario(
   const fila: Record<string, unknown> = { phone, nombre };
   if (estadoConversacion !== null) fila.estado_conversacion = estadoConversacion;
   if (moneda !== null) fila.moneda = moneda;
+  // Prueba gratis: vence a los config.trialDias días del alta. Al vencer, el
+  // candado de acceso (accesoVigente) invita a suscribirse.
+  if (config.trialDias > 0) {
+    fila.trial_ends_at = new Date(Date.now() + config.trialDias * 86_400_000).toISOString();
+  }
 
   const { data, error } = await supabase.from('usuarios').insert(fila).select().single();
 

@@ -47,4 +47,7 @@ export const config = {
   // Commit desplegado (Railway lo expone). Se adjunta a los reportes de bug para
   // saber en qué versión ocurrió.
   version: (process.env.RAILWAY_GIT_COMMIT_SHA ?? 'dev').slice(0, 7),
+  // Días de prueba gratis para un usuario nuevo (desde su alta). 0 = sin trial
+  // (acceso libre). Los usuarios previos sin fecha quedan con acceso libre.
+  trialDias: Number(process.env.TRIAL_DIAS ?? 14),
 } as const;

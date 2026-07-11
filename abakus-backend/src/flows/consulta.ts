@@ -19,6 +19,16 @@ export function detectarComando(texto: string): ComandoEspecial | null {
   const t = texto.trim().toLowerCase();
   if (t === 'resumen' || t === 'saldo') return 'resumen';
   if ((t.startsWith('resumen') || t.startsWith('saldo')) && tieneMes(t)) return 'resumen';
+  // Resumen en lenguaje natural: "¿cómo voy este mes?", "cuánto llevo", etc.
+  // (sin números, para no pisar registros como "gané 5000 este mes").
+  if (!/\d/.test(t) && (
+    t.includes('cómo voy') || t.includes('como voy') ||
+    t.includes('cómo van mis finanzas') || t.includes('como van mis finanzas') ||
+    t.includes('cómo va el mes') || t.includes('como va el mes') ||
+    t.includes('cuánto llevo') || t.includes('cuanto llevo') ||
+    t.includes('cuánto gané este mes') || t.includes('cuanto gane este mes') ||
+    t === 'mi resumen' || t === 'mi balance'
+  )) return 'resumen';
   if (
     t === 'por pagar' || t === 'cuentas por pagar' || t === 'porpagar' ||
     t === 'pagos pendientes' || t === 'qué debo' || t === 'que debo' ||
@@ -147,7 +157,9 @@ export async function handleComando(
     const esMesActual = !tieneMes(t);
     const periodo = esMesActual ? mesActual() : parsearPeriodo(t);
     const movs = await getMovimientosPeriodo(user.phone, periodo.desde, periodo.hasta);
-    return formatearResumen(movs, periodo.label, esMesActual, esMesActual ? user.meta_mensual : null, user.moneda);
+    // "Por cobrar" solo aplica al panorama actual (no a un mes histórico).
+    const porCobrar = esMesActual ? await sumaPorCobrar(user.phone) : null;
+    return formatearResumen(movs, periodo.label, esMesActual, esMesActual ? user.meta_mensual : null, user.moneda, porCobrar);
   }
 
   if (comando === 'detalle') {
@@ -354,12 +366,23 @@ function progresoBarra(pct: number): string {
   return '█'.repeat(llenas) + '░'.repeat(5 - llenas);
 }
 
+/** Suma total de lo que le deben al usuario (cuentas por cobrar pendientes). */
+async function sumaPorCobrar(phone: string): Promise<number> {
+  try {
+    const cuentas = await getCuentasPendientes(phone, 'por_cobrar');
+    return cuentas.reduce((s, c) => s + Number(c.monto), 0);
+  } catch {
+    return 0;
+  }
+}
+
 export function formatearResumen(
   movs: Movimiento[],
   label: string,
   esMesActual = false,
   meta?: number | null,
   moneda?: string | null,
+  porCobrar?: number | null,
 ): string {
   const f = (n: number) => formatMonto(n, moneda);
   const ingresos = movs.filter((m) => m.tipo === 'ingreso').reduce((s, m) => s + Number(m.monto), 0);
@@ -367,6 +390,7 @@ export function formatearResumen(
   const balance = ingresos - egresos;
 
   let msg = `📊 *Resumen ${label}*\n💰 Ingresos: ${f(ingresos)}\n💸 Egresos: ${f(egresos)}\n🧮 Balance: ${balance >= 0 ? '' : '-'}${f(Math.abs(balance))}`;
+  if (porCobrar && porCobrar > 0) msg += `\n📋 Por cobrar: ${f(porCobrar)}`;
 
   // Proyección de cierre: siempre en el mes actual (no depende de meta).
   if (esMesActual && ingresos > 0) {
