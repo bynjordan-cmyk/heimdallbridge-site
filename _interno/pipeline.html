@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pipeline — meta US$10.000</title>
+<meta name="robots" content="noindex,nofollow">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --navy:#1A2D4A; --navy-deep:#0d1726; --navy2:#243d5f; --teal:#005F65;
+  --teal2:#008089; --gold:#8A6010; --gold2:#C49A30; --cream:#F4F1EB;
+  --warm:#EDE9E2; --mid:#C8C2B8; --dark:#1A1612; --white:#fff;
+  --red:#8E2C2C; --green:#2F6B4F;
+  --serif:'Cormorant Garamond',Georgia,serif;
+  --sans:'DM Sans',system-ui,sans-serif;
+  --mono:'DM Mono',ui-monospace,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--sans);background:var(--cream);color:var(--dark);font-size:14.5px;line-height:1.5}
+.wrap{max-width:1240px;margin:0 auto;padding:0 22px}
+
+.topbar{background:var(--navy-deep);color:var(--cream);padding:13px 0}
+.topbar .wrap{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
+.brand{font-family:var(--serif);font-size:19px}
+.brand span{color:var(--gold2)}
+.topbar .tools{display:flex;gap:8px;flex-wrap:wrap}
+
+.btn{font-family:var(--sans);font-size:13px;font-weight:500;padding:9px 16px;border-radius:3px;border:1px solid var(--navy);background:var(--navy);color:var(--cream);cursor:pointer;transition:.16s;line-height:1.2}
+.btn:hover{background:var(--navy2);border-color:var(--navy2)}
+.btn.ghost{background:none;color:var(--navy);border-color:var(--mid)}
+.btn.ghost:hover{background:var(--warm)}
+.btn.dk{background:none;border-color:rgba(255,255,255,.28);color:var(--cream)}
+.btn.dk:hover{background:rgba(255,255,255,.1)}
+.btn.gold{background:var(--gold);border-color:var(--gold)}
+.btn.gold:hover{background:var(--gold2);border-color:var(--gold2)}
+.btn.xs{padding:5px 10px;font-size:12px}
+
+/* --- meta --- */
+.meta{background:var(--navy);color:var(--cream);padding:28px 0 30px;margin-bottom:26px}
+.meta .wrap{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;gap:26px;align-items:end}
+@media(max-width:900px){.meta .wrap{grid-template-columns:1fr 1fr}}
+.m .k{font-family:var(--mono);font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--mid)}
+.m .v{font-family:var(--serif);font-size:38px;line-height:1;margin-top:7px}
+.m .v.gold{color:var(--gold2)}
+.m .s{font-size:12px;color:var(--mid);margin-top:5px}
+.track{height:8px;background:rgba(255,255,255,.15);border-radius:99px;overflow:hidden;margin-top:14px}
+.track i{display:block;height:100%;background:var(--gold2);border-radius:99px;transition:width .5s cubic-bezier(.2,.7,.3,1)}
+.track i.b{background:rgba(255,255,255,.42)}
+
+section{margin-bottom:26px}
+h2{font-family:var(--serif);font-size:25px;font-weight:400;color:var(--navy);margin-bottom:4px}
+.sub{font-size:13px;color:#8a857c;margin-bottom:16px}
+
+/* --- actividad --- */
+.acts{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}
+.act{background:var(--white);border:1px solid var(--warm);padding:18px 20px}
+.act.ok{border-color:var(--green);border-width:1px 1px 1px 3px}
+.act .k{font-size:13.5px;font-weight:500;color:var(--navy)}
+.act .row{display:flex;align-items:baseline;gap:9px;margin-top:10px}
+.act .n{font-family:var(--serif);font-size:36px;line-height:1;color:var(--navy)}
+.act .goal{font-family:var(--mono);font-size:12.5px;color:#8a857c}
+.act .ctrl{display:flex;gap:6px;margin-top:12px}
+.act button{width:34px;height:30px;border:1px solid var(--warm);background:var(--cream);border-radius:3px;cursor:pointer;font-size:15px;color:var(--navy);line-height:1}
+.act button:hover{background:var(--warm)}
+
+/* --- embudo --- */
+.fun{background:var(--white);border:1px solid var(--warm);padding:20px 24px}
+.frow{display:grid;grid-template-columns:150px 1fr 128px;gap:16px;align-items:center;padding:9px 0;border-bottom:1px solid #f4f1ec}
+.frow:last-child{border-bottom:0}
+.frow .l{font-size:13.5px;color:var(--navy)}
+.frow .bar{height:20px;background:var(--warm);border-radius:2px;overflow:hidden;position:relative}
+.frow .bar i{display:block;height:100%;background:var(--teal);transition:width .45s}
+.frow .bar u{position:absolute;top:0;bottom:0;width:2px;background:var(--red)}
+.frow .r{font-family:var(--mono);font-size:12.5px;text-align:right;color:#5a554d;white-space:nowrap}
+.frow .r b{color:var(--navy)}
+@media(max-width:700px){.frow{grid-template-columns:110px 1fr;}.frow .r{grid-column:2;text-align:left}}
+
+/* --- tabla --- */
+.tbl{background:var(--white);border:1px solid var(--warm);overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th{background:var(--warm);text-align:left;padding:10px 12px;font-family:var(--mono);font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--navy);white-space:nowrap}
+td{padding:7px 12px;border-top:1px solid #f4f1ec;vertical-align:middle}
+tbody tr:hover{background:#fbfaf7}
+tbody tr.won{background:#f2f7f4}
+tbody tr.lost{opacity:.5}
+td input,td select{width:100%;min-width:80px;border:1px solid transparent;background:none;padding:5px 6px;font-family:var(--sans);font-size:13.5px;border-radius:2px;color:var(--dark)}
+td input:hover,td select:hover{border-color:var(--warm)}
+td input:focus,td select:focus{outline:none;border-color:var(--teal);background:var(--cream)}
+td input.num{text-align:right;font-family:var(--mono)}
+td.del{width:34px}
+td.del button{border:0;background:none;color:var(--mid);cursor:pointer;font-size:15px;padding:3px 6px;line-height:1}
+td.del button:hover{color:var(--red)}
+.empty{padding:34px 24px;text-align:center;color:#8a857c;font-size:13.5px}
+
+.note{background:var(--white);border-left:2px solid var(--gold2);padding:15px 20px;font-size:13px;color:#5a554d;margin-top:16px}
+.note b{color:var(--navy)}
+footer{padding:30px 0 50px;font-size:12px;color:#8a857c}
+footer a{color:var(--teal)}
+.toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(18px);background:var(--navy);color:var(--cream);padding:12px 22px;border-radius:3px;font-size:13.5px;opacity:0;pointer-events:none;transition:.26s;z-index:99}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="wrap">
+  <div class="brand">Heimdall <span>Bridge</span> · Pipeline</div>
+  <div class="tools">
+    <button class="btn dk" id="bAdd">+ Prospecto</button>
+    <button class="btn dk" id="bExp">Respaldar</button>
+    <button class="btn dk" id="bImp">Restaurar</button>
+    <input type="file" id="fImp" accept=".json" hidden>
+  </div>
+</div></div>
+
+<div class="meta"><div class="wrap">
+  <div class="m">
+    <div class="k">Meta del mes</div>
+    <div class="v gold" id="mCobrado">US$0</div>
+    <div class="s" id="mSub">de US$10.000 cobrados</div>
+    <div class="track"><i class="b" id="tBar2" style="width:0"></i></div>
+    <div class="track" style="margin-top:5px"><i id="tBar" style="width:0"></i></div>
+    <div class="s" style="margin-top:8px">Barra dorada: cobrado · barra clara: contratado</div>
+  </div>
+  <div class="m">
+    <div class="k">Contratado</div>
+    <div class="v" id="mContratado">US$0</div>
+    <div class="s" id="mGanados">0 contratos firmados</div>
+  </div>
+  <div class="m">
+    <div class="k">En negociación</div>
+    <div class="v" id="mAbierto">US$0</div>
+    <div class="s" id="mProps">0 propuestas vivas</div>
+  </div>
+  <div class="m">
+    <div class="k">Días restantes</div>
+    <div class="v" id="mDias">30</div>
+    <div class="s"><input type="date" id="fIni" style="background:none;border:0;border-bottom:1px solid rgba(255,255,255,.3);color:var(--mid);font-family:var(--mono);font-size:11px;padding:2px 0"></div>
+  </div>
+</div></div>
+
+<div class="wrap">
+
+  <section>
+    <h2>Actividad de hoy</h2>
+    <div class="sub" id="hoyFecha"></div>
+    <div class="acts" id="acts"></div>
+    <div class="note" id="ritmo"></div>
+  </section>
+
+  <section>
+    <h2>Embudo</h2>
+    <div class="sub">Lo que hay contra lo que hace falta para firmar seis contratos. La marca roja es el objetivo.</div>
+    <div class="fun" id="fun"></div>
+  </section>
+
+  <section>
+    <h2>Prospectos</h2>
+    <div class="sub">Se guarda solo, en este navegador. Respalda de vez en cuando — si borras los datos del navegador, esto se va con ellos.</div>
+    <div class="tbl">
+      <table>
+        <thead><tr>
+          <th>Empresa</th><th>Contacto</th><th>Canal</th><th>Compra anual</th>
+          <th>Etapa</th><th>Producto</th><th style="text-align:right">Valor US$</th>
+          <th style="text-align:right">Cobrado US$</th><th>Próximo paso</th><th>Fecha</th><th></th>
+        </tr></thead>
+        <tbody id="tb"></tbody>
+      </table>
+      <div class="empty" id="vacio">Sin prospectos todavía. Dale a «+ Prospecto» y empieza por los diez que ya te conocen.</div>
+    </div>
+  </section>
+
+</div>
+
+<footer><div class="wrap">
+  Uso interno · Heimdall Bridge Consulting · Guía completa en <a href="00-PLAN-30-DIAS.md">00-PLAN-30-DIAS.md</a>
+</div></footer>
+
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const KEY = "hb_pipeline_v1";
+
+const ETAPAS = ["Contactado","Conversando","Diagnóstico","Propuesta","Ganado","Perdido"];
+const PRODUCTOS = {
+  "Radar 14": 1850,
+  "Radar 14 pago único": 1700,
+  "Radar 6 meses": 1200,
+  "Radar + Recuperación": 950,
+  "Control Continuo": 1200,
+  "Otro": 0
+};
+// objetivos del embudo, tomados del plan de 30 días
+const OBJETIVO = {Contactado:280, Conversando:50, "Diagnóstico":15, Propuesta:12, Ganado:6};
+const METAS_DIA = {contactos:14, seguimientos:5, diagnosticos:1};
+const ETIQ_DIA = {contactos:"Contactos nuevos", seguimientos:"Seguimientos", diagnosticos:"Diagnósticos"};
+const META = 10000;
+
+let D = cargar();
+
+function cargar(){
+  try{
+    const raw = localStorage.getItem(KEY);
+    if(raw){
+      const d = JSON.parse(raw);
+      d.prospectos = d.prospectos || [];
+      d.actividad  = d.actividad  || {};
+      d.inicio     = d.inicio     || hoy();
+      return d;
+    }
+  }catch(e){ /* datos corruptos: se empieza limpio */ }
+  return {prospectos:[], actividad:{}, inicio:hoy()};
+}
+function guardar(){
+  try{ localStorage.setItem(KEY, JSON.stringify(D)); }
+  catch(e){ toast("No se pudo guardar — revisa el almacenamiento del navegador"); }
+}
+function hoy(){
+  const d = new Date();
+  return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
+}
+const nf = new Intl.NumberFormat("es-DO", {maximumFractionDigits:0});
+const usd = n => "US$" + nf.format(Math.round(n || 0));
+
+function toast(m){
+  const t = $("toast"); t.textContent = m; t.classList.add("on");
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove("on"), 2000);
+}
+
+/* ---------- actividad ---------- */
+function actHoy(){
+  const k = hoy();
+  if(!D.actividad[k]) D.actividad[k] = {contactos:0, seguimientos:0, diagnosticos:0};
+  return D.actividad[k];
+}
+function renderActs(){
+  const a = actHoy();
+  $("hoyFecha").textContent = new Date().toLocaleDateString("es-DO",
+    {weekday:"long", day:"numeric", month:"long"});
+  $("acts").innerHTML = Object.keys(METAS_DIA).map(k => {
+    const ok = a[k] >= METAS_DIA[k];
+    return '<div class="act' + (ok ? " ok" : "") + '">' +
+      '<div class="k">' + ETIQ_DIA[k] + '</div>' +
+      '<div class="row"><div class="n">' + a[k] + '</div><div class="goal">/ ' + METAS_DIA[k] + ' hoy</div></div>' +
+      '<div class="ctrl"><button data-k="' + k + '" data-d="-1">–</button>' +
+      '<button data-k="' + k + '" data-d="1">+</button></div></div>';
+  }).join("");
+  $("acts").querySelectorAll("button").forEach(b => {
+    b.onclick = () => {
+      const a2 = actHoy();
+      a2[b.dataset.k] = Math.max(0, a2[b.dataset.k] + (+b.dataset.d));
+      guardar(); renderActs(); renderRitmo();
+    };
+  });
+}
+
+function renderRitmo(){
+  // ¿el ritmo acumulado de contactos alcanza para los 280 del plan?
+  const total = Object.values(D.actividad).reduce((s,a) => s + (a.contactos||0), 0);
+  const dias = diasTranscurridos();
+  const rest = Math.max(0, 20 - dias);
+  const faltan = Math.max(0, OBJETIVO.Contactado - total);
+  const porDia = rest > 0 ? Math.ceil(faltan / rest) : faltan;
+  let msg;
+  if(faltan === 0){
+    msg = "<b>Llegaste a los 280 contactos del plan.</b> A partir de aquí el cuello de botella es cerrar, no prospectar.";
+  } else if(dias === 0){
+    msg = "Llevas <b>" + total + "</b> contactos. El plan pide 280 en veinte días hábiles: <b>14 al día</b>.";
+  } else if(porDia > METAS_DIA.contactos * 1.5){
+    msg = "Llevas <b>" + total + "</b> contactos en " + dias + " días. Para llegar a 280 harían falta <b>" +
+      porDia + " al día</b> en los " + rest + " que quedan — es mucho. Conviene ajustar la meta del mes o " +
+      "conseguir ayuda para la lista, en vez de fingir que se va a recuperar.";
+  } else {
+    msg = "Llevas <b>" + total + "</b> contactos en " + dias + " días. Faltan " + faltan +
+      " en " + rest + " días hábiles: <b>" + porDia + " al día</b>. Vas en ritmo.";
+  }
+  $("ritmo").innerHTML = msg;
+}
+
+function diasTranscurridos(){
+  const ini = new Date(D.inicio + "T00:00:00");
+  const n = new Date(hoy() + "T00:00:00");
+  let d = 0;
+  const cur = new Date(ini);
+  while(cur < n){
+    const g = cur.getDay();
+    if(g !== 0 && g !== 6) d++;
+    cur.setDate(cur.getDate() + 1);
+  }
+  return d;
+}
+
+/* ---------- meta ---------- */
+function renderMeta(){
+  const P = D.prospectos;
+  const ganados = P.filter(p => p.etapa === "Ganado");
+  const contratado = ganados.reduce((s,p) => s + (+p.valor || 0), 0);
+  const cobrado    = P.reduce((s,p) => s + (+p.cobrado || 0), 0);
+  const abiertas   = P.filter(p => p.etapa === "Propuesta");
+  const abierto    = abiertas.reduce((s,p) => s + (+p.valor || 0), 0);
+
+  $("mCobrado").textContent = usd(cobrado);
+  $("mSub").textContent = "de " + usd(META) + " cobrados — " + Math.round(cobrado/META*100) + "%";
+  $("mContratado").textContent = usd(contratado);
+  $("mGanados").textContent = ganados.length + (ganados.length === 1 ? " contrato firmado" : " contratos firmados");
+  $("mAbierto").textContent = usd(abierto);
+  $("mProps").textContent = abiertas.length + (abiertas.length === 1 ? " propuesta viva" : " propuestas vivas");
+  $("tBar").style.width  = Math.min(100, cobrado/META*100) + "%";
+  $("tBar2").style.width = Math.min(100, contratado/META*100) + "%";
+
+  const ini = new Date(D.inicio + "T00:00:00");
+  const fin = new Date(ini); fin.setDate(fin.getDate() + 30);
+  const rest = Math.max(0, Math.ceil((fin - new Date(hoy() + "T00:00:00")) / 86400000));
+  $("mDias").textContent = rest;
+}
+
+/* ---------- embudo ---------- */
+function renderFun(){
+  const P = D.prospectos;
+  // una etapa cuenta a todo el que llegó al menos hasta ahí
+  const idx = e => ETAPAS.indexOf(e);
+  const alcanzo = (p, e) => p.etapa === "Perdido" ? (idx(p.maxEtapa || p.etapa) >= idx(e)) : idx(p.etapa) >= idx(e);
+  const filas = Object.keys(OBJETIVO).map(e => {
+    const n = P.filter(p => alcanzo(p, e)).length;
+    const obj = OBJETIVO[e];
+    return {e, n, obj};
+  });
+  const max = Math.max(...filas.map(f => Math.max(f.n, f.obj)), 1);
+  $("fun").innerHTML = filas.map(f =>
+    '<div class="frow">' +
+      '<div class="l">' + f.e + '</div>' +
+      '<div class="bar"><i style="width:' + (f.n/max*100) + '%"></i>' +
+        '<u style="left:' + (f.obj/max*100) + '%"></u></div>' +
+      '<div class="r"><b>' + f.n + '</b> de ' + f.obj +
+        (f.n >= f.obj ? ' ✓' : ' · faltan ' + (f.obj - f.n)) + '</div>' +
+    '</div>').join("");
+}
+
+/* ---------- tabla ---------- */
+function renderTabla(){
+  const tb = $("tb");
+  $("vacio").style.display = D.prospectos.length ? "none" : "block";
+  tb.innerHTML = D.prospectos.map((p, i) => {
+    const cls = p.etapa === "Ganado" ? "won" : p.etapa === "Perdido" ? "lost" : "";
+    return '<tr class="' + cls + '">' +
+      td(i, "empresa", p.empresa, "text", "Empresa") +
+      td(i, "contacto", p.contacto, "text", "Nombre") +
+      sel(i, "canal", p.canal, ["WhatsApp","Correo","LinkedIn","Presencial","Referido","Llamada"]) +
+      td(i, "compra", p.compra, "text", "US$3M") +
+      sel(i, "etapa", p.etapa, ETAPAS) +
+      sel(i, "producto", p.producto, Object.keys(PRODUCTOS)) +
+      td(i, "valor", p.valor, "number", "0", true) +
+      td(i, "cobrado", p.cobrado, "number", "0", true) +
+      td(i, "prox", p.prox, "text", "Qué sigue") +
+      td(i, "fecha", p.fecha, "date", "") +
+      '<td class="del"><button data-del="' + i + '" title="Eliminar">✕</button></td>' +
+    '</tr>';
+  }).join("");
+
+  tb.querySelectorAll("input,select").forEach(el => {
+    el.onchange = () => {
+      const i = +el.dataset.i, k = el.dataset.k;
+      D.prospectos[i][k] = el.value;
+      // al elegir producto se propone su precio si aún no hay valor
+      if(k === "producto" && !+D.prospectos[i].valor && PRODUCTOS[el.value]){
+        D.prospectos[i].valor = PRODUCTOS[el.value];
+      }
+      // recuerda hasta dónde llegó, para que el embudo no pierda a los perdidos
+      if(k === "etapa" && el.value !== "Perdido"){
+        const idx = e => ETAPAS.indexOf(e);
+        if(idx(el.value) > idx(D.prospectos[i].maxEtapa || "Contactado")){
+          D.prospectos[i].maxEtapa = el.value;
+        }
+      }
+      guardar(); render();
+    };
+  });
+  tb.querySelectorAll("[data-del]").forEach(b => {
+    b.onclick = () => {
+      const i = +b.dataset.del;
+      if(confirm("¿Eliminar " + (D.prospectos[i].empresa || "este prospecto") + "?")){
+        D.prospectos.splice(i, 1); guardar(); render();
+      }
+    };
+  });
+}
+
+function td(i, k, v, type, ph, num){
+  return '<td><input data-i="' + i + '" data-k="' + k + '" type="' + type + '" value="' +
+    esc(v == null ? "" : v) + '" placeholder="' + esc(ph) + '"' + (num ? ' class="num"' : '') + '></td>';
+}
+function sel(i, k, v, opts){
+  return '<td><select data-i="' + i + '" data-k="' + k + '">' +
+    opts.map(o => '<option' + (o === v ? " selected" : "") + '>' + esc(o) + '</option>').join("") +
+    '</select></td>';
+}
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+/* ---------- acciones ---------- */
+$("bAdd").onclick = () => {
+  D.prospectos.unshift({empresa:"", contacto:"", canal:"WhatsApp", compra:"", etapa:"Contactado",
+                        producto:"Radar 14", valor:1850, cobrado:0, prox:"", fecha:hoy(), maxEtapa:"Contactado"});
+  guardar(); render();
+  const f = $("tb").querySelector("input");
+  if(f) f.focus();
+};
+
+$("bExp").onclick = () => {
+  const blob = new Blob([JSON.stringify(D, null, 2)], {type:"application/json"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "pipeline-" + hoy() + ".json";
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  toast("Respaldo descargado");
+};
+
+$("bImp").onclick = () => $("fImp").click();
+$("fImp").onchange = e => {
+  const f = e.target.files[0];
+  if(!f) return;
+  const r = new FileReader();
+  r.onload = () => {
+    try{
+      const d = JSON.parse(r.result);
+      if(!Array.isArray(d.prospectos)) throw new Error("formato");
+      if(!confirm("Esto reemplaza lo que tienes ahora. ¿Seguir?")) return;
+      D = {prospectos:d.prospectos, actividad:d.actividad || {}, inicio:d.inicio || hoy()};
+      guardar(); render(); toast("Restaurado");
+    }catch(err){ toast("El archivo no es un respaldo válido"); }
+  };
+  r.readAsText(f);
+  e.target.value = "";
+};
+
+$("fIni").onchange = e => {
+  if(e.target.value){ D.inicio = e.target.value; guardar(); render(); }
+};
+
+/* ---------- render ---------- */
+function render(){
+  $("fIni").value = D.inicio;
+  renderMeta(); renderActs(); renderRitmo(); renderFun(); renderTabla();
+}
+render();
+</script>
+</body>
+</html>

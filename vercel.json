@@ -1,0 +1,13 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "redirects": [
+    { "source": "/_interno", "destination": "/", "permanent": false },
+    { "source": "/_interno/:path*", "destination": "/", "permanent": false }
+  ],
+  "headers": [
+    {
+      "source": "/motor/(.*)",
+      "headers": [{ "key": "X-Robots-Tag", "value": "noindex" }]
+    }
+  ]
+}

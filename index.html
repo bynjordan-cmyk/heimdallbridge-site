@@ -357,7 +357,9 @@ const services = {
     title:'Auditoría <em>P2P</em>',
     pain:'Desde que decides comprar hasta que el dinero sale hay seis pasos. En cada uno puede haber un error, un abuso o una pérdida. La pregunta no es si existe — es cuánto lleva pasando.',
     como:'Revisamos el ciclo completo de compras y pagos de un período. Cruzamos órdenes, recepciones y facturas para detectar compras sin orden, pagos duplicados, facturas sin recepción y proveedores irregulares.',
-    entregables:['Informe de hallazgos con evidencia documentada','Impacto económico estimado de cada hallazgo','Matriz de riesgo del ciclo P2P','Plan de acción priorizado','Presentación ejecutiva para dirección']
+    entregables:['Informe de hallazgos con evidencia documentada','Impacto económico estimado de cada hallazgo','Matriz de riesgo del ciclo P2P','Plan de acción priorizado','Presentación ejecutiva para dirección'],
+    link:'/auditoria/',
+    linkText:'Conocer Radar 14 — auditoría express en 14 días →'
   },
   diagnostico:{
     eyebrow:'Servicio 04 · Proyecto puntual',
@@ -409,6 +411,13 @@ function openDetail(key){
       <div class="detail-cta-text">¿Quieres saber si este servicio es para tu empresa?</div>
       <a href="mailto:hola@heimdallbridge.com" class="detail-cta-btn">Agendar diagnóstico gratuito</a>
     </div>`;
+    if(s.link){
+      html += `
+    <div class="reveal-layer abakus-redirect">
+      <div class="layer-text">Este servicio está productizado con precio cerrado, plazo de 14 días y garantía de hallazgo.</div>
+      <a href="${s.link}">${s.linkText}</a>
+    </div>`;
+    }
   }
   c.innerHTML = html;
   document.getElementById('detailOverlay').classList.add('open');

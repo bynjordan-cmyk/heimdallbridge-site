@@ -1,0 +1,1466 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Motor de Fugas — Heimdall Bridge</title>
+<meta name="robots" content="noindex,nofollow">
+<meta name="description" content="Análisis de cuentas por pagar: detecta pagos duplicados, proveedores repetidos, fraccionamiento de compras y gasto disperso. Todo se procesa en tu navegador.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --navy:#1A2D4A; --navy-deep:#0d1726; --navy2:#243d5f; --teal:#005F65;
+  --teal2:#008089; --gold:#8A6010; --gold2:#C49A30; --cream:#F4F1EB;
+  --warm:#EDE9E2; --mid:#C8C2B8; --dark:#1A1612; --white:#fff;
+  --red:#8E2C2C; --red-soft:#fbeaea;
+  --serif:'Cormorant Garamond',Georgia,serif;
+  --sans:'DM Sans',system-ui,sans-serif;
+  --mono:'DM Mono',ui-monospace,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{font-family:var(--sans);background:var(--cream);color:var(--dark);font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1180px;margin:0 auto;padding:0 24px}
+
+/* ---------- barra superior ---------- */
+.topbar{background:var(--navy-deep);color:var(--cream);padding:14px 0;position:sticky;top:0;z-index:50;border-bottom:1px solid rgba(255,255,255,.08)}
+.topbar .wrap{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.brand{font-family:var(--serif);font-size:20px;letter-spacing:.02em;font-weight:500}
+.brand span{color:var(--gold2)}
+.brand small{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.22em;text-transform:uppercase;color:var(--mid);margin-top:2px;font-weight:400}
+.topbar-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.privacy{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#7ecfc4;border:1px solid rgba(126,207,196,.35);padding:5px 10px;border-radius:999px;white-space:nowrap}
+
+/* ---------- stepper ---------- */
+.steps{display:flex;gap:0;border-bottom:1px solid var(--warm);background:var(--white)}
+.steps .wrap{display:flex;gap:4px}
+.step{flex:1;padding:16px 12px;font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--mid);border-bottom:2px solid transparent;display:flex;align-items:center;gap:10px;background:none;border-top:0;border-left:0;border-right:0;cursor:default;text-align:left}
+.step b{width:22px;height:22px;border-radius:50%;border:1px solid currentColor;display:grid;place-items:center;font-size:10px;flex:none}
+.step span{white-space:nowrap}
+.step.on{color:var(--teal);border-bottom-color:var(--teal)}
+.step.done{color:var(--navy);cursor:pointer}
+.step.done b{background:var(--navy);color:var(--white);border-color:var(--navy)}
+
+main{padding:40px 0 80px}
+.panel{display:none}
+.panel.on{display:block;animation:fade .35s ease}
+@keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+h1{font-family:var(--serif);font-size:clamp(30px,4.5vw,46px);font-weight:400;line-height:1.1;letter-spacing:-.01em;color:var(--navy)}
+h2{font-family:var(--serif);font-size:clamp(24px,3vw,32px);font-weight:400;color:var(--navy);line-height:1.15}
+h3{font-family:var(--sans);font-size:15px;font-weight:600;color:var(--navy)}
+.lead{font-size:17px;color:#4a4640;max-width:64ch;margin-top:14px}
+.eyebrow{font-family:var(--mono);font-size:10.5px;letter-spacing:.24em;text-transform:uppercase;color:var(--teal);margin-bottom:14px}
+
+/* ---------- carga ---------- */
+.drop{margin-top:32px;border:1.5px dashed var(--mid);border-radius:6px;background:var(--white);padding:56px 28px;text-align:center;transition:.2s;cursor:pointer}
+.drop:hover,.drop.hot{border-color:var(--teal);background:#fbfaf7}
+.drop-ic{font-size:34px;color:var(--mid);font-family:var(--serif)}
+.drop h3{margin:14px 0 6px;font-size:17px}
+.drop p{color:#6b665e;font-size:13.5px}
+.or{display:flex;align-items:center;gap:14px;margin:26px 0;color:var(--mid);font-family:var(--mono);font-size:10.5px;letter-spacing:.2em;text-transform:uppercase}
+.or::before,.or::after{content:"";flex:1;height:1px;background:var(--warm)}
+textarea.paste{width:100%;min-height:130px;font-family:var(--mono);font-size:12px;padding:14px;border:1px solid var(--warm);border-radius:4px;background:var(--white);resize:vertical;color:var(--dark)}
+textarea.paste:focus{outline:none;border-color:var(--teal)}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:9px;font-family:var(--sans);font-size:14px;font-weight:500;padding:13px 26px;border-radius:3px;border:1px solid var(--navy);background:var(--navy);color:var(--cream);cursor:pointer;transition:.18s;text-decoration:none;line-height:1}
+.btn:hover{background:var(--navy2);border-color:var(--navy2)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn.ghost{background:none;color:var(--navy)}
+.btn.ghost:hover{background:var(--warm)}
+.btn.teal{background:var(--teal);border-color:var(--teal)}
+.btn.teal:hover{background:var(--teal2);border-color:var(--teal2)}
+.btn.sm{padding:9px 16px;font-size:12.5px}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.mt24{margin-top:24px}.mt32{margin-top:32px}.mt40{margin-top:40px}.mt12{margin-top:12px}
+
+.hint{background:var(--white);border-left:2px solid var(--gold2);padding:16px 20px;margin-top:28px;font-size:13.5px;color:#5a554d}
+.hint b{color:var(--navy)}
+.hint code{font-family:var(--mono);font-size:12px;background:var(--warm);padding:1px 5px;border-radius:2px}
+
+/* ---------- mapeo ---------- */
+.maps{display:grid;grid-template-columns:repeat(auto-fill,minmax(268px,1fr));gap:14px;margin-top:28px}
+.map{background:var(--white);border:1px solid var(--warm);border-radius:4px;padding:14px 16px}
+.map label{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--navy);margin-bottom:8px}
+.map label i{color:var(--red);font-style:normal}
+.map label em{font-style:normal;color:var(--mid);letter-spacing:.06em;text-transform:none;font-size:10.5px}
+.map select{width:100%;padding:9px 10px;border:1px solid var(--warm);border-radius:3px;font-family:var(--sans);font-size:13.5px;background:var(--cream);color:var(--dark)}
+.map select:focus{outline:none;border-color:var(--teal)}
+.map .prev{font-family:var(--mono);font-size:11px;color:#8a857c;margin-top:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-height:16px}
+.opts{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;margin-top:24px;background:var(--white);border:1px solid var(--warm);padding:20px;border-radius:4px}
+.opt label{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--navy);margin-bottom:8px}
+.opt input,.opt select{width:100%;padding:9px 10px;border:1px solid var(--warm);border-radius:3px;font-family:var(--sans);font-size:13.5px;background:var(--cream)}
+.opt small{display:block;color:#8a857c;font-size:11.5px;margin-top:6px;line-height:1.4}
+.err{background:var(--red-soft);border-left:2px solid var(--red);color:#6d2020;padding:14px 18px;margin-top:20px;font-size:13.5px;display:none}
+.err.on{display:block}
+
+/* ---------- informe ---------- */
+.rep-head{background:var(--navy);color:var(--cream);padding:38px 34px;border-radius:4px}
+.rep-head .eyebrow{color:var(--gold2)}
+.rep-head h2{color:var(--white)}
+.rep-meta{font-family:var(--mono);font-size:11.5px;color:var(--mid);margin-top:12px;letter-spacing:.04em}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1px;background:rgba(255,255,255,.14);margin-top:30px;border:1px solid rgba(255,255,255,.14)}
+.kpi{background:var(--navy);padding:20px 18px}
+.kpi .k{font-family:var(--mono);font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--mid)}
+.kpi .v{font-family:var(--serif);font-size:30px;line-height:1.1;margin-top:8px;color:var(--white);font-weight:500}
+.kpi .v.hi{color:var(--gold2)}
+.kpi .s{font-size:11.5px;color:var(--mid);margin-top:5px}
+
+.summary{background:var(--white);border:1px solid var(--warm);padding:26px 30px;margin-top:22px;border-radius:4px}
+.summary p{font-size:15px;color:#4a4640;max-width:80ch}
+.summary p+p{margin-top:12px}
+.summary strong{color:var(--navy)}
+
+.finding{background:var(--white);border:1px solid var(--warm);border-radius:4px;margin-top:18px;overflow:hidden;break-inside:avoid}
+.f-head{display:flex;gap:18px;align-items:flex-start;padding:20px 24px;border-bottom:1px solid var(--warm);flex-wrap:wrap}
+.f-head .t{flex:1;min-width:260px}
+.f-title{display:flex;align-items:center;gap:11px;flex-wrap:wrap}
+.f-title h3{font-size:16.5px}
+.sev{font-family:var(--mono);font-size:9px;letter-spacing:.16em;text-transform:uppercase;padding:3px 8px;border-radius:2px;white-space:nowrap}
+.sev.alta{background:var(--red-soft);color:var(--red)}
+.sev.media{background:#fbf3e0;color:var(--gold)}
+.sev.info{background:#e6f0ef;color:var(--teal)}
+.f-desc{font-size:13.5px;color:#6b665e;margin-top:7px;max-width:78ch}
+.f-nums{display:flex;gap:26px;flex:none}
+.f-num .k{font-family:var(--mono);font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--mid)}
+.f-num .v{font-family:var(--mono);font-size:18px;color:var(--navy);margin-top:4px;font-weight:500}
+.f-num .v.hi{color:var(--gold)}
+.f-body{padding:0}
+.tblwrap{overflow-x:auto;max-height:430px;overflow-y:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{position:sticky;top:0;background:var(--warm);text-align:left;padding:9px 14px;font-family:var(--mono);font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--navy);white-space:nowrap;z-index:1}
+td{padding:9px 14px;border-top:1px solid #f0ede7;vertical-align:top}
+td.num{text-align:right;font-family:var(--mono);white-space:nowrap}
+tbody tr:hover{background:#fbfaf7}
+.f-foot{padding:15px 24px;background:#fbfaf7;border-top:1px solid var(--warm);font-size:13px;color:#5a554d}
+.f-foot b{color:var(--navy)}
+.f-more{padding:10px 24px;font-family:var(--mono);font-size:11px;color:#8a857c;border-top:1px solid var(--warm)}
+.clean{padding:22px 24px;color:#6b665e;font-size:13.5px}
+
+.method{background:var(--white);border:1px solid var(--warm);padding:26px 30px;margin-top:30px;border-radius:4px;font-size:13.5px;color:#5a554d}
+.method h3{margin-bottom:12px}
+.method ul{margin:10px 0 0 18px}
+.method li{margin-bottom:7px}
+.method table{margin-top:14px;font-size:12.5px}
+.disclaimer{font-size:12px;color:#8a857c;margin-top:22px;line-height:1.6;max-width:90ch}
+
+.repbar{display:flex;gap:10px;flex-wrap:wrap;margin-top:30px;padding-top:22px;border-top:1px solid var(--warm)}
+footer{border-top:1px solid var(--warm);padding:28px 0;font-size:12px;color:#8a857c}
+footer a{color:var(--teal)}
+
+@media (max-width:640px){
+  .step span{display:none}
+  .f-nums{width:100%;justify-content:flex-start}
+  .rep-head{padding:26px 20px}
+}
+@media print{
+  .topbar,.steps,.repbar,.drop,footer{display:none!important}
+  body{background:#fff;font-size:11px}
+  .wrap{max-width:none;padding:0}
+  main{padding:0}
+  .finding,.summary,.method{border-color:#ddd;break-inside:avoid}
+  .tblwrap{max-height:none;overflow:visible}
+  .rep-head{background:#1A2D4A!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .kpi{background:#1A2D4A!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  th{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="wrap">
+    <div class="brand">Heimdall <span>Bridge</span><small>Motor de detección de fugas</small></div>
+    <div class="topbar-actions">
+      <span class="privacy">100% local · tus datos no salen del navegador</span>
+    </div>
+  </div>
+</div>
+
+<div class="steps"><div class="wrap">
+  <button class="step on" id="st1"><b>1</b><span>Cargar datos</span></button>
+  <button class="step" id="st2"><b>2</b><span>Mapear columnas</span></button>
+  <button class="step" id="st3"><b>3</b><span>Informe</span></button>
+</div></div>
+
+<main><div class="wrap">
+
+  <!-- ============ PASO 1 ============ -->
+  <section class="panel on" id="p1">
+    <div class="eyebrow">Paso 1 — Datos</div>
+    <h1>Sube el mayor de cuentas por pagar</h1>
+    <p class="lead">Un archivo CSV con los últimos 12 meses de facturas o pagos a proveedores. El análisis corre completo dentro de tu navegador: nada se sube a ningún servidor, nada se guarda.</p>
+
+    <div class="drop" id="drop">
+      <div class="drop-ic">↓</div>
+      <h3>Arrastra tu archivo CSV aquí</h3>
+      <p>o haz clic para buscarlo — también acepta .txt y .tsv</p>
+      <input type="file" id="file" accept=".csv,.txt,.tsv" hidden>
+    </div>
+
+    <div class="or">o</div>
+    <textarea class="paste" id="paste" placeholder="Pega aquí las celdas directamente desde Excel (Ctrl+C en Excel → Ctrl+V aquí). Incluye la fila de encabezados."></textarea>
+    <div class="row mt12">
+      <button class="btn ghost sm" id="btnPaste">Usar lo pegado</button>
+      <button class="btn teal sm" id="btnDemo">Cargar datos de demostración</button>
+    </div>
+
+    <div class="hint">
+      <b>¿Qué columnas necesito?</b> Con tres basta para arrancar: <code>fecha</code>, <code>proveedor</code> y <code>monto</code>.
+      Si además tienes <code>número de factura</code>, <code>RNC/RUT</code> o <code>cuenta bancaria</code>, el motor activa las pruebas de duplicados y de proveedores repetidos, que son las que más dinero encuentran.
+      Desde Excel: <em>Archivo → Guardar como → CSV UTF-8</em>.
+    </div>
+    <div class="err" id="err1"></div>
+  </section>
+
+  <!-- ============ PASO 2 ============ -->
+  <section class="panel" id="p2">
+    <div class="eyebrow">Paso 2 — Mapeo</div>
+    <h1>Dime qué es cada columna</h1>
+    <p class="lead" id="p2sub"></p>
+    <div class="maps" id="maps"></div>
+
+    <div class="opts">
+      <div class="opt">
+        <label>Moneda</label>
+        <select id="optCur">
+          <option value="RD$">RD$ — peso dominicano</option>
+          <option value="US$">US$ — dólar</option>
+          <option value="$">$ — peso chileno</option>
+          <option value="€">€ — euro</option>
+        </select>
+        <small>Solo afecta cómo se muestran las cifras.</small>
+      </div>
+      <div class="opt">
+        <label>Umbral de aprobación</label>
+        <input type="number" id="optThr" placeholder="Automático">
+        <small>Monto a partir del cual una compra requiere firma superior. Se usa para detectar fraccionamiento. Déjalo vacío y lo estimo solo.</small>
+      </div>
+      <div class="opt">
+        <label>Empresa analizada</label>
+        <input type="text" id="optCli" placeholder="Nombre del cliente">
+        <small>Aparece en el encabezado del informe.</small>
+      </div>
+      <div class="opt">
+        <label>Ventana de duplicados</label>
+        <input type="number" id="optWin" value="90">
+        <small>Días máximos entre dos cargos del mismo monto para considerarlos duplicado probable.</small>
+      </div>
+    </div>
+
+    <div class="err" id="err2"></div>
+    <div class="row mt32">
+      <button class="btn teal" id="btnRun">Ejecutar análisis →</button>
+      <button class="btn ghost" id="btnBack1">← Cambiar archivo</button>
+    </div>
+  </section>
+
+  <!-- ============ PASO 3 ============ -->
+  <section class="panel" id="p3">
+    <div id="report"></div>
+    <div class="repbar">
+      <button class="btn" onclick="window.print()">Descargar informe en PDF</button>
+      <button class="btn ghost" id="btnCsv">Exportar casos a CSV</button>
+      <button class="btn ghost" id="btnBack2">← Ajustar mapeo</button>
+      <button class="btn ghost" id="btnReset">Analizar otro archivo</button>
+    </div>
+  </section>
+
+</div></main>
+
+<footer><div class="wrap">
+  Heimdall Bridge Consulting · Control financiero del gasto · <a href="mailto:hola@heimdallbridge.com">hola@heimdallbridge.com</a>
+  — Herramienta de uso interno y demostración. Los hallazgos son indicios estadísticos y requieren validación documental antes de reclamar a un proveedor.
+</div></footer>
+
+<script>
+"use strict";
+
+/* ============================================================
+   1. UTILIDADES DE PARSEO
+   ============================================================ */
+
+function detectDelim(text){
+  const line = text.split(/\r?\n/).find(l => l.trim()) || "";
+  const cands = [",",";","\t","|"];
+  let best = ",", bestN = 0;
+  for(const d of cands){
+    // cuenta ocurrencias fuera de comillas
+    let n = 0, q = false;
+    for(let i=0;i<line.length;i++){
+      if(line[i] === '"') q = !q;
+      else if(!q && line[i] === d) n++;
+    }
+    if(n > bestN){ bestN = n; best = d; }
+  }
+  return best;
+}
+
+function parseCSV(text){
+  text = text.replace(/^﻿/, "");
+  const d = detectDelim(text);
+  const rows = [];
+  let row = [], field = "", inQ = false, i = 0;
+  while(i < text.length){
+    const c = text[i];
+    if(inQ){
+      if(c === '"'){
+        if(text[i+1] === '"'){ field += '"'; i += 2; continue; }
+        inQ = false; i++; continue;
+      }
+      field += c; i++; continue;
+    }
+    if(c === '"'){ inQ = true; i++; continue; }
+    if(c === d){ row.push(field); field = ""; i++; continue; }
+    if(c === "\r"){ i++; continue; }
+    if(c === "\n"){ row.push(field); rows.push(row); row = []; field = ""; i++; continue; }
+    field += c; i++;
+  }
+  if(field !== "" || row.length){ row.push(field); rows.push(row); }
+  return rows
+    .map(r => r.map(v => v.trim()))
+    .filter(r => r.some(v => v !== ""));
+}
+
+/* --- números: decide si el separador decimal es coma o punto --- */
+function detectDecimalSep(samples){
+  let coma = 0, punto = 0;
+  for(const raw of samples){
+    const s = String(raw).replace(/[^0-9.,]/g, "");
+    if(!s) continue;
+    if(/,\d{1,2}$/.test(s)) coma++;
+    else if(/\.\d{1,2}$/.test(s)) punto++;
+    else if(/\.\d{3}$/.test(s)) coma++;   // 1.234 → miles con punto → decimal es coma
+    else if(/,\d{3}$/.test(s)) punto++;   // 1,234 → miles con coma → decimal es punto
+  }
+  return coma > punto ? "," : ".";
+}
+
+function parseNum(v, dec){
+  if(typeof v === "number") return v;
+  if(v == null) return NaN;
+  let s = String(v).trim();
+  if(!s) return NaN;
+  let neg = false;
+  if(/^\(.*\)$/.test(s)){ neg = true; s = s.slice(1, -1); }
+  if(/-/.test(s)) neg = true;
+  s = s.replace(/[^0-9.,]/g, "");
+  if(!s) return NaN;
+  if(dec === ","){ s = s.replace(/\./g, "").replace(",", "."); }
+  else { s = s.replace(/,/g, ""); }
+  const parts = s.split(".");
+  if(parts.length > 2) s = parts.slice(0, -1).join("") + "." + parts[parts.length-1];
+  const n = parseFloat(s);
+  if(!isFinite(n)) return NaN;
+  return neg ? -n : n;
+}
+
+/* --- fechas --- */
+function detectDateOrder(samples){
+  let dmy = 0, mdy = 0;
+  for(const raw of samples){
+    const m = String(raw).trim().match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/);
+    if(!m) continue;
+    const a = +m[1], b = +m[2];
+    if(a > 12 && b <= 12) dmy++;
+    else if(b > 12 && a <= 12) mdy++;
+  }
+  return mdy > dmy ? "MDY" : "DMY";   // por defecto latinoamericano
+}
+
+function parseDate(v, order){
+  if(v == null) return null;
+  const s = String(v).trim();
+  if(!s) return null;
+  // ISO: 2026-03-14  /  2026-03-14T10:00
+  let m = s.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})/);
+  if(m){ const d = new Date(+m[1], +m[2]-1, +m[3]); return isNaN(d) ? null : d; }
+  // dd/mm/yyyy o mm/dd/yyyy
+  m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/);
+  if(m){
+    let a = +m[1], b = +m[2], y = +m[3];
+    if(y < 100) y += y < 70 ? 2000 : 1900;
+    let dd, mm;
+    if(order === "MDY"){ mm = a; dd = b; } else { dd = a; mm = b; }
+    if(mm > 12 && dd <= 12){ const t = mm; mm = dd; dd = t; }   // rescate
+    const d = new Date(y, mm-1, dd);
+    return isNaN(d) ? null : d;
+  }
+  // serial de Excel
+  if(/^\d{5}(\.\d+)?$/.test(s)){
+    const n = parseFloat(s);
+    if(n > 20000 && n < 60000){
+      const d = new Date(Date.UTC(1899, 11, 30) + n * 86400000);
+      return isNaN(d) ? null : d;
+    }
+  }
+  const d = new Date(s);
+  return isNaN(d) ? null : d;
+}
+
+/* --- normalización de texto --- */
+const LEGALES = new Set([
+  "srl","sa","sas","saa","eirl","ltda","ltd","cxa","ca","spa","inc","corp","llc","lc",
+  "cia","compania","company","group","grupo","co","sac","sl","sarl","de","rl","the","y"
+]);
+
+function stripAccents(s){
+  return String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "");
+}
+
+function normName(s){
+  const base = stripAccents(String(s || "").toLowerCase())
+    .replace(/[.\-_&/'’,]/g, "")
+    .replace(/[^a-z0-9 ]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const toks = base.split(" ").filter(t => t && !LEGALES.has(t));
+  const out = toks.join(" ");
+  return out || base;
+}
+
+function normDoc(s){
+  return stripAccents(String(s || "").toUpperCase()).replace(/[^A-Z0-9]/g, "");
+}
+
+function docCore(s){                     // núcleo numérico sin ceros a la izquierda
+  const digits = String(s || "").replace(/\D/g, "").replace(/^0+/, "");
+  return digits.length >= 3 ? digits : "";
+}
+
+/* --- formato --- */
+let CUR = "RD$";
+let nf0 = new Intl.NumberFormat("es-DO", {maximumFractionDigits:0});
+let nf2 = new Intl.NumberFormat("es-DO", {minimumFractionDigits:2, maximumFractionDigits:2});
+const LOCALES = {"RD$":"es-DO", "US$":"en-US", "$":"es-CL", "€":"es-ES"};
+function setMoneda(cur){
+  CUR = cur;
+  const loc = LOCALES[cur] || "es-DO";
+  const dec = cur === "$" ? 0 : 2;                 // el peso chileno no usa centavos
+  nf0 = new Intl.NumberFormat(loc, {maximumFractionDigits:0});
+  nf2 = new Intl.NumberFormat(loc, {minimumFractionDigits:dec, maximumFractionDigits:dec});
+}
+const money  = n => CUR + " " + nf0.format(Math.round(n || 0));
+const money2 = n => CUR + " " + nf2.format(n || 0);
+const pct = (a, b) => b ? (a/b*100).toFixed(1).replace(".", ",") + "%" : "—";
+const fdate = d => d ? String(d.getDate()).padStart(2,"0") + "/" + String(d.getMonth()+1).padStart(2,"0") + "/" + d.getFullYear() : "—";
+const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+function quantile(sorted, q){
+  if(!sorted.length) return 0;
+  const pos = (sorted.length - 1) * q;
+  const lo = Math.floor(pos), hi = Math.ceil(pos);
+  return sorted[lo] + (sorted[hi] - sorted[lo]) * (pos - lo);
+}
+
+/* ============================================================
+   2. ESTADO
+   ============================================================ */
+
+const CAMPOS = [
+  {k:"fecha",     n:"Fecha del documento", req:true,  h:["fecha","date","fec","emision","emisión","fecha factura","fechafactura","fecha_doc","fchdoc","fecha emision","invoice date","posting date","fecha contabilizacion"]},
+  {k:"proveedor", n:"Proveedor",           req:true,  h:["proveedor","supplier","vendor","beneficiario","razon social","razón social","nombre proveedor","acreedor","tercero","nombre"]},
+  {k:"monto",     n:"Monto",               req:true,  h:["monto","importe","total","valor","amount","monto total","valor total","importe total","debe","neto","monto pagado","total factura"]},
+  {k:"documento", n:"N.º de factura / documento", req:false, h:["factura","ncf","documento","doc","numero","número","comprobante","invoice","referencia","nro factura","no factura","num doc","folio","numero factura"]},
+  {k:"provId",    n:"Código o RNC/RUT del proveedor", req:false, h:["rnc","rut","nit","cedula","cédula","codigo proveedor","código proveedor","cod prov","id proveedor","tax id","vendor id","nif","ruc"]},
+  {k:"banco",     n:"Cuenta bancaria destino", req:false, h:["cuenta","cuenta bancaria","banco","no cuenta","numero cuenta","iban","cta","account","cuenta destino"]},
+  {k:"categoria", n:"Categoría o centro de costo", req:false, h:["categoria","categoría","rubro","centro de costo","cc","departamento","area","área","cuenta contable","concepto contable","clase"]},
+  {k:"desc",      n:"Descripción / concepto", req:false, h:["descripcion","descripción","concepto","detalle","glosa","memo","observacion","observación","referencia detalle"]},
+  {k:"item",      n:"Artículo o SKU",       req:false, h:["articulo","artículo","item","sku","producto","codigo articulo","material","descripcion item"]},
+  {k:"cant",      n:"Cantidad",             req:false, h:["cantidad","cant","qty","unidades","volumen"]},
+  {k:"precio",    n:"Precio unitario",      req:false, h:["precio","precio unitario","punit","unit price","valor unitario","precio unit"]}
+];
+
+const S = {
+  headers: [], rows: [], map: {}, dec: ".", order: "DMY",
+  tx: [], cfg: {}, findings: [], stats: {}, fuente: ""
+};
+
+/* ============================================================
+   3. INTERFAZ — navegación
+   ============================================================ */
+
+const $ = id => document.getElementById(id);
+
+function goto(n){
+  [1,2,3].forEach(i => {
+    $("p"+i).classList.toggle("on", i === n);
+    const st = $("st"+i);
+    st.classList.toggle("on", i === n);
+    st.classList.toggle("done", i < n);
+  });
+  window.scrollTo({top:0, behavior:"smooth"});
+}
+$("st1").onclick = () => { if(S.rows.length) goto(1); };
+$("st2").onclick = () => { if(S.rows.length) goto(2); };
+$("st3").onclick = () => { if(S.findings.length) goto(3); };
+
+function showErr(id, msg){
+  const e = $(id);
+  if(!msg){ e.classList.remove("on"); return; }
+  e.textContent = msg;
+  e.classList.add("on");
+}
+
+/* ============================================================
+   4. PASO 1 — carga
+   ============================================================ */
+
+const drop = $("drop"), fileInput = $("file");
+drop.onclick = () => fileInput.click();
+["dragenter","dragover"].forEach(ev => drop.addEventListener(ev, e => {
+  e.preventDefault(); drop.classList.add("hot");
+}));
+["dragleave","drop"].forEach(ev => drop.addEventListener(ev, e => {
+  e.preventDefault(); drop.classList.remove("hot");
+}));
+drop.addEventListener("drop", e => {
+  const f = e.dataTransfer.files[0];
+  if(f) readFile(f);
+});
+fileInput.onchange = e => { const f = e.target.files[0]; if(f) readFile(f); };
+
+function readFile(f){
+  const r = new FileReader();
+  r.onload = () => ingest(r.result, f.name);
+  r.onerror = () => showErr("err1", "No pude leer el archivo. Intenta guardarlo de nuevo como CSV UTF-8.");
+  r.readAsText(f, "UTF-8");
+}
+
+$("btnPaste").onclick = () => {
+  const t = $("paste").value;
+  if(!t.trim()) return showErr("err1", "El cuadro de texto está vacío.");
+  ingest(t, "datos pegados");
+};
+
+$("btnDemo").onclick = () => ingest(generarDemo(), "datos de demostración");
+
+function ingest(text, fuente){
+  showErr("err1", "");
+  let rows;
+  try { rows = parseCSV(text); }
+  catch(e){ return showErr("err1", "El archivo no se pudo interpretar como CSV."); }
+
+  if(rows.length < 2) return showErr("err1", "Encontré menos de 2 filas. Revisa que el archivo tenga encabezados y al menos una transacción.");
+
+  // busca la fila de encabezados: la primera con >=3 celdas no vacías y no numéricas
+  let hi = 0;
+  for(let i = 0; i < Math.min(rows.length, 12); i++){
+    const nonEmpty = rows[i].filter(c => c !== "");
+    const texty = nonEmpty.filter(c => isNaN(parseFloat(c.replace(/[^0-9.,-]/g, "")))).length;
+    if(nonEmpty.length >= 3 && texty >= Math.ceil(nonEmpty.length * 0.6)){ hi = i; break; }
+  }
+
+  S.headers = rows[hi].map((h, i) => h || ("Columna " + (i+1)));
+  S.rows = rows.slice(hi+1).filter(r => r.some(v => v !== ""));
+  S.fuente = fuente;
+
+  if(!S.rows.length) return showErr("err1", "Detecté encabezados pero ninguna fila de datos debajo.");
+
+  autoMap();
+  renderMaps();
+  $("p2sub").textContent =
+    "Leí " + nf0.format(S.rows.length) + " filas y " + S.headers.length +
+    " columnas de " + fuente + ". Ya adiviné lo que pude — corrige lo que esté mal. Los campos opcionales suman pruebas al análisis.";
+  goto(2);
+}
+
+/* ============================================================
+   5. PASO 2 — mapeo
+   ============================================================ */
+
+function scoreHeader(header, campo){
+  const h = normName(header).replace(/\s+/g, " ");
+  const hj = h.replace(/ /g, "");
+  let best = 0;
+  for(const cand of campo.h){
+    const c = normName(cand), cj = c.replace(/ /g, "");
+    if(h === c || hj === cj) return 100;
+    if(hj.includes(cj) || cj.includes(hj)) best = Math.max(best, 70 - Math.abs(hj.length - cj.length));
+  }
+  return best;
+}
+
+function autoMap(){
+  S.map = {};
+  const usadas = new Set();
+  // asigna primero los obligatorios
+  const orden = CAMPOS.slice().sort((a,b) => (b.req?1:0) - (a.req?1:0));
+  for(const campo of orden){
+    let mejor = -1, mejorSc = 35;
+    S.headers.forEach((h, i) => {
+      if(usadas.has(i)) return;
+      const sc = scoreHeader(h, campo);
+      if(sc > mejorSc){ mejorSc = sc; mejor = i; }
+    });
+    if(mejor >= 0){ S.map[campo.k] = mejor; usadas.add(mejor); }
+  }
+  // si no encontró monto, toma la columna más numérica que quede
+  if(S.map.monto == null){
+    let mejor = -1, mejorN = 0;
+    S.headers.forEach((h, i) => {
+      if(usadas.has(i)) return;
+      const n = S.rows.slice(0, 200).filter(r => {
+        const v = (r[i] || "").replace(/[^0-9.,-]/g, "");
+        return v.length && !isNaN(parseFloat(v));
+      }).length;
+      if(n > mejorN){ mejorN = n; mejor = i; }
+    });
+    if(mejor >= 0 && mejorN > S.rows.slice(0,200).length * 0.6){ S.map.monto = mejor; usadas.add(mejor); }
+  }
+}
+
+function renderMaps(){
+  const wrap = $("maps");
+  wrap.innerHTML = CAMPOS.map(c => {
+    const sel = S.map[c.k];
+    const opts = ['<option value="">— sin asignar —</option>'].concat(
+      S.headers.map((h, i) => '<option value="' + i + '"' + (i === sel ? " selected" : "") + ">" + esc(h) + "</option>")
+    ).join("");
+    return '<div class="map">' +
+      '<label>' + esc(c.n) + (c.req ? ' <i>*</i>' : ' <em>(opcional)</em>') + '</label>' +
+      '<select data-k="' + c.k + '">' + opts + '</select>' +
+      '<div class="prev" id="prev-' + c.k + '"></div>' +
+    '</div>';
+  }).join("");
+
+  wrap.querySelectorAll("select").forEach(s => {
+    s.onchange = () => {
+      const v = s.value;
+      S.map[s.dataset.k] = v === "" ? null : +v;
+      preview(s.dataset.k);
+    };
+  });
+  CAMPOS.forEach(c => preview(c.k));
+}
+
+function preview(k){
+  const el = $("prev-" + k);
+  if(!el) return;
+  const i = S.map[k];
+  if(i == null){ el.textContent = ""; return; }
+  const vals = S.rows.slice(0, 60).map(r => r[i]).filter(v => v !== "" && v != null).slice(0, 3);
+  el.textContent = vals.length ? "ej.: " + vals.join("  ·  ") : "(columna vacía)";
+}
+
+$("btnBack1").onclick = () => goto(1);
+$("btnBack2").onclick = () => goto(2);
+$("btnReset").onclick = () => { S.rows = []; S.findings = []; $("paste").value = ""; fileInput.value = ""; goto(1); };
+
+/* ============================================================
+   6. CONSTRUCCIÓN DE TRANSACCIONES
+   ============================================================ */
+
+function construir(){
+  const m = S.map;
+  const col = (r, k) => m[k] == null ? "" : (r[m[k]] || "");
+
+  const muestraMonto = S.rows.slice(0, 400).map(r => col(r, "monto")).filter(Boolean);
+  S.dec = detectDecimalSep(muestraMonto);
+  const muestraFecha = S.rows.slice(0, 400).map(r => col(r, "fecha")).filter(Boolean);
+  S.order = detectDateOrder(muestraFecha);
+
+  const tx = [];
+  let sinFecha = 0, sinMonto = 0, negativos = 0;
+
+  S.rows.forEach((r, idx) => {
+    const monto = parseNum(col(r, "monto"), S.dec);
+    if(!isFinite(monto)){ sinMonto++; return; }
+    const fecha = parseDate(col(r, "fecha"), S.order);
+    if(!fecha){ sinFecha++; }
+    if(monto < 0){ negativos++; }
+
+    const prov = String(col(r, "proveedor")).trim();
+    const doc  = String(col(r, "documento")).trim();
+    tx.push({
+      i: idx + 2,                       // fila aproximada en el archivo original
+      fecha, monto,
+      abs: Math.abs(monto),
+      cents: Math.round(Math.abs(monto) * 100),
+      prov: prov || "(sin proveedor)",
+      pk: normName(prov) || "(sin proveedor)",
+      provId: String(col(r, "provId")).trim(),
+      doc,
+      dk: normDoc(doc),
+      dcore: docCore(doc),
+      banco: normDoc(col(r, "banco")),
+      cat: String(col(r, "categoria")).trim(),
+      desc: String(col(r, "desc")).trim(),
+      item: String(col(r, "item")).trim(),
+      cant: parseNum(col(r, "cant"), S.dec),
+      precio: parseNum(col(r, "precio"), S.dec)
+    });
+  });
+
+  S.descartes = {sinFecha, sinMonto, negativos};
+  return tx;
+}
+
+/* ============================================================
+   7. DETECTORES
+   ============================================================ */
+
+/* Cada detector devuelve:
+   {id, titulo, sev, que, exposicion, recuperable, factor, cols, casos, accion, nota}
+   exposicion  = dinero bruto involucrado
+   recuperable = estimación conservadora de recuperación o ahorro (exposición × factor)   */
+
+function grupos(arr, keyFn){
+  const m = new Map();
+  for(const t of arr){
+    const k = keyFn(t);
+    if(k == null || k === "") continue;
+    if(!m.has(k)) m.set(k, []);
+    m.get(k).push(t);
+  }
+  return m;
+}
+
+const dias = (a, b) => (a && b) ? Math.abs(a - b) / 86400000 : 0;
+
+/* --- D1: duplicado exacto (proveedor + monto + documento) --- */
+function d1(tx){
+  const casos = [];
+  let exp = 0;
+  const g = grupos(tx.filter(t => t.dk && t.abs > 0), t => t.pk + "|" + t.cents + "|" + t.dk);
+  for(const [, arr] of g){
+    if(arr.length < 2) continue;
+    arr.sort((a,b) => (a.fecha||0) - (b.fecha||0));
+    const extra = (arr.length - 1) * arr[0].abs;
+    exp += extra;
+    casos.push({
+      prov: arr[0].prov, doc: arr[0].doc, monto: arr[0].abs, veces: arr.length,
+      fechas: arr.map(t => fdate(t.fecha)).join(" · "),
+      filas: arr.map(t => t.i).join(", "),
+      dup: extra
+    });
+  }
+  casos.sort((a,b) => b.dup - a.dup);
+  return {
+    id:"d1", sev:"alta", titulo:"Pagos duplicados exactos",
+    que:"El mismo proveedor, el mismo número de documento y el mismo monto aparecen registrados más de una vez. Es la fuga más limpia de demostrar y de cobrar: se reclama con la copia de los dos asientos.",
+    exposicion: exp, factor: 0.85, recuperable: exp * 0.85,
+    cols: ["Proveedor","Documento","Monto","Veces","Fechas","Duplicado"],
+    casos: casos.map(c => [c.prov, c.doc || "—", money2(c.monto), c.veces + "×", c.fechas, money2(c.dup)]),
+    nums: [2,5],
+    accion:"Extraer los asientos, confirmar contra el banco que ambos salieron y emitir reclamación o nota de crédito por el excedente. Plazo típico de recuperación: 15 a 45 días.",
+    nota:"Factor de recuperación 85%: se descuenta el porcentaje habitual de casos que resultan ser abonos parciales legítimos registrados con el mismo folio."
+  };
+}
+
+/* --- D2: duplicado probable (mismo monto, documento distinto, ventana de días) --- */
+function d2(tx, ventana){
+  const casos = [];
+  let exp = 0;
+  const g = grupos(tx.filter(t => t.abs > 0), t => t.pk + "|" + t.cents);
+  for(const [, arr] of g){
+    if(arr.length < 2) continue;
+    arr.sort((a,b) => (a.fecha||0) - (b.fecha||0));
+    for(let i = 1; i < arr.length; i++){
+      const a = arr[i-1], b = arr[i];
+      if(a.dk && b.dk && a.dk === b.dk) continue;                 // ya lo cazó D1
+      const dd = dias(a.fecha, b.fecha);
+      if(a.fecha && b.fecha && dd > ventana) continue;
+      exp += b.abs;
+      casos.push({
+        prov: b.prov, monto: b.abs, d1: a.doc || "(sin n.º)", d2: b.doc || "(sin n.º)",
+        f1: fdate(a.fecha), f2: fdate(b.fecha), dd: Math.round(dd), filas: a.i + " y " + b.i
+      });
+    }
+  }
+  casos.sort((x,y) => y.monto - x.monto);
+  return {
+    id:"d2", sev:"alta", titulo:"Duplicados probables — mismo monto, documento distinto",
+    que:"Dos cargos idénticos al mismo proveedor con pocos días de diferencia y números de documento distintos o ausentes. Suele ser la misma factura recapturada tras un error, un tecleo de folio equivocado, o una factura pagada por dos vías (transferencia y caja chica).",
+    exposicion: exp, factor: 0.30, recuperable: exp * 0.30,
+    cols: ["Proveedor","Monto","Doc. 1","Doc. 2","Fecha 1","Fecha 2","Días","Filas"],
+    casos: casos.map(c => [c.prov, money2(c.monto), c.d1, c.d2, c.f1, c.f2, c.dd, c.filas]),
+    nums: [1,6],
+    accion:"Revisar el soporte físico de cada par. En nuestra experiencia entre 1 de cada 3 y 1 de cada 4 pares resulta ser un doble pago real; el resto son cargos recurrentes legítimos de igual monto.",
+    nota:"Factor de recuperación 30%: deliberadamente conservador porque los servicios de monto fijo (alquileres, pólizas, iguala) generan coincidencias legítimas."
+  };
+}
+
+/* --- D3: mismo documento, montos distintos --- */
+function d3(tx){
+  const casos = [];
+  let exp = 0;
+  const g = grupos(tx.filter(t => t.dk), t => t.pk + "|" + t.dk);
+  for(const [, arr] of g){
+    if(arr.length < 2) continue;
+    const montos = new Set(arr.map(t => t.cents));
+    if(montos.size < 2) continue;
+    const orden = arr.slice().sort((a,b) => b.abs - a.abs);
+    const menor = orden.slice(1).reduce((s,t) => s + t.abs, 0);
+    exp += menor;
+    casos.push({v: menor, r: [
+      arr[0].prov, arr[0].doc, arr.length + "×",
+      orden.map(t => money2(t.abs)).join(" · "),
+      arr.map(t => fdate(t.fecha)).join(" · "),
+      money2(menor)
+    ]});
+  }
+  casos.sort((a,b) => b.v - a.v);
+  return {
+    id:"d3", sev:"media", titulo:"Un mismo documento con montos diferentes",
+    que:"El mismo número de factura fue registrado varias veces con importes distintos. Puede ser un pago parcial correcto, pero también una factura reemitida que se pagó dos veces con ajuste, o una captura errónea que infla el pasivo.",
+    exposicion: exp, factor: 0.20, recuperable: exp * 0.20,
+    cols: ["Proveedor","Documento","Registros","Montos","Fechas","Menor(es)"],
+    casos: casos.map(c => c.r),
+    nums: [5],
+    accion:"Conciliar el estado de cuenta del proveedor contra el auxiliar de CxP. Es también un indicador de que el control de captura de folios no está funcionando.",
+    nota:"Factor 20%: la mayoría son pagos parciales legítimos; el valor real de este hallazgo es de control, no de caja."
+  };
+}
+
+/* --- D4: proveedores duplicados en el maestro --- */
+function d4(tx){
+  const porNombre = grupos(tx, t => t.pk);
+  const casos = [];
+  let exp = 0, cuantos = 0;
+  for(const [k, arr] of porNombre){
+    const variantes = new Map();
+    for(const t of arr){
+      const etiqueta = t.prov.trim();
+      if(!variantes.has(etiqueta)) variantes.set(etiqueta, {n:0, monto:0, ids:new Set()});
+      const v = variantes.get(etiqueta);
+      v.n++; v.monto += t.abs;
+      if(t.provId) v.ids.add(t.provId);
+    }
+    const idsDistintos = new Set(arr.map(t => t.provId).filter(Boolean));
+    const hayVariantes = variantes.size > 1;
+    const hayIds = idsDistintos.size > 1;
+    if(!hayVariantes && !hayIds) continue;
+    const total = arr.reduce((s,t) => s + t.abs, 0);
+    exp += total; cuantos++;
+    casos.push({v: total, r: [
+      Array.from(variantes.keys()).join("  |  "),
+      variantes.size,
+      idsDistintos.size ? Array.from(idsDistintos).join(", ") : "—",
+      arr.length,
+      money(total)
+    ]});
+  }
+  casos.sort((a,b) => b.v - a.v);
+  return {
+    id:"d4", sev:"media", titulo:"El mismo proveedor cargado varias veces en el maestro",
+    que:"Un solo proveedor real existe en el sistema bajo dos o más registros — con o sin punto en las siglas, con S.R.L. o sin ella, o con códigos distintos. Cada registro duplicado esconde el volumen verdadero que le compras, debilita la negociación y es el terreno donde crecen los pagos dobles sin que salte ninguna alerta.",
+    exposicion: exp, factor: 0.02, recuperable: exp * 0.02,
+    cols: ["Variantes del nombre","N.º de variantes","Códigos / RNC","Transacciones","Gasto consolidado"],
+    casos: casos.map(c => c.r), nums: [4],
+    accion:"Fusionar los registros en el ERP dejando un único código maestro, y renegociar con el volumen consolidado a la vista. Es el hallazgo que más rápido se convierte en descuento por volumen.",
+    nota:"Factor 2% del gasto consolidado: estimación prudente del descuento que se obtiene al renegociar mostrando el volumen real. No es dinero ya perdido: es dinero que se deja de ganar.",
+    extra: cuantos
+  };
+}
+
+/* --- D5: cuenta bancaria compartida por proveedores distintos --- */
+function d5(tx){
+  const conBanco = tx.filter(t => t.banco && t.banco.length >= 6);
+  if(!conBanco.length) return null;
+  const g = grupos(conBanco, t => t.banco);
+  const casos = [];
+  let exp = 0;
+  for(const [cta, arr] of g){
+    const provs = new Set(arr.map(t => t.pk));
+    if(provs.size < 2) continue;
+    const total = arr.reduce((s,t) => s + t.abs, 0);
+    exp += total;
+    casos.push({v: total, r: [
+      "···" + cta.slice(-4),
+      Array.from(new Set(arr.map(t => t.prov))).join("  |  "),
+      provs.size, arr.length, money(total)
+    ]});
+  }
+  if(!casos.length) return null;
+  casos.sort((a,b) => b.v - a.v);
+  return {
+    id:"d5", sev:"alta", titulo:"Una misma cuenta bancaria recibe pagos de proveedores distintos",
+    que:"Dos o más proveedores con nombres diferentes cobran en la misma cuenta. A veces es legítimo — empresas del mismo grupo, un factoring, un representante de varias marcas. Cuando no lo es, es el patrón clásico del proveedor fantasma.",
+    exposicion: exp, factor: 0, recuperable: 0,
+    cols: ["Cuenta","Proveedores que la comparten","N.º","Transacciones","Monto pagado"],
+    casos: casos.map(c => c.r), nums: [4],
+    accion:"Verificar cada caso contra el registro mercantil y el expediente del proveedor. Este hallazgo no se cuantifica como recuperación: se escala a la gerencia el mismo día.",
+    nota:"No se le asigna valor recuperable. Su importancia es de riesgo, no de monto."
+  };
+}
+
+/* --- D6: fraccionamiento de compras --- */
+function d6(tx, umbral){
+  const casos = [];
+  let exp = 0;
+  // el patrón de fraccionamiento no es "muchas facturas pequeñas": es varias facturas
+  // que rozan el techo sin pasarlo. Por eso solo cuentan las que llegan al 40% del umbral.
+  const piso = umbral * 0.4;
+  const g = grupos(tx.filter(t => t.fecha && t.abs >= piso && t.abs < umbral), t => t.pk);
+  for(const [, arr] of g){
+    arr.sort((a,b) => a.fecha - b.fecha);
+    let i = 0;
+    while(i < arr.length){
+      let j = i;
+      while(j + 1 < arr.length && dias(arr[i].fecha, arr[j+1].fecha) <= 7) j++;
+      const bloque = arr.slice(i, j+1);
+      const suma = bloque.reduce((s,t) => s + t.abs, 0);
+      if(bloque.length >= 3 && suma > umbral){
+        exp += suma;
+        casos.push({v: suma, r: [
+          bloque[0].prov, bloque.length,
+          fdate(bloque[0].fecha) + " – " + fdate(bloque[bloque.length-1].fecha),
+          money2(suma), money2(suma / bloque.length)
+        ]});
+        i = j + 1;
+      } else {
+        i++;
+      }
+    }
+  }
+  casos.sort((a,b) => b.v - a.v);
+  return {
+    id:"d6", sev:"media", titulo:"Compras fraccionadas por debajo del umbral de aprobación",
+    que:"Tres o más facturas al mismo proveedor dentro de una misma semana, cada una por debajo de " + money(umbral) + ", que juntas superan ese umbral. Es el patrón de quien parte una compra grande en pedazos pequeños para no pedir la firma de arriba — o para no licitar.",
+    exposicion: exp, factor: 0.05, recuperable: exp * 0.05,
+    cols: ["Proveedor","Facturas","Periodo","Suma","Promedio"],
+    casos: casos.map(c => c.r), nums: [3,4],
+    accion:"Consolidar estas compras en una orden única con cotización competitiva. El ahorro típico al llevar a competencia un gasto que nunca la tuvo ronda el 5%.",
+    nota:"Umbral usado: " + money(umbral) + (S.cfg.thrAuto ? " (estimado automáticamente a partir del percentil 90 de tus montos)" : " (definido por ti)") + "."
+  };
+}
+
+/* --- D7: montos atípicos por proveedor --- */
+function d7(tx){
+  const g = grupos(tx.filter(t => t.abs > 0), t => t.pk);
+  const casos = [];
+  let exp = 0;
+  for(const [, arr] of g){
+    if(arr.length < 8) continue;
+    const ord = arr.map(t => t.abs).sort((a,b) => a-b);
+    const q1 = quantile(ord, 0.25), q3 = quantile(ord, 0.75), med = quantile(ord, 0.5);
+    const iqr = q3 - q1;
+    if(iqr <= 0) continue;
+    const lim = q3 + 3 * iqr;
+    for(const t of arr){
+      if(t.abs > lim){
+        const sobre = t.abs - med;
+        exp += sobre;
+        casos.push({v: sobre, r: [t.prov, fdate(t.fecha), t.doc || "—", money2(t.abs), money2(med),
+                    (t.abs/med).toFixed(1).replace(".", ",") + "×", money2(sobre)]});
+      }
+    }
+  }
+  casos.sort((a,b) => b.v - a.v);
+  if(!casos.length) return null;
+  return {
+    id:"d7", sev:"media", titulo:"Facturas muy por encima del patrón de ese proveedor",
+    que:"Cargos que superan tres veces el rango intercuartílico del propio proveedor. No es que sean altos en abstracto: es que ese proveedor nunca factura así. Suele ser un error de digitación (un cero de más), una factura de otro cliente, o un cobro que nadie revisó.",
+    exposicion: exp, factor: 0.10, recuperable: exp * 0.10,
+    cols: ["Proveedor","Fecha","Documento","Monto","Mediana del proveedor","Múltiplo","Exceso"],
+    casos: casos.map(c => c.r), nums: [3,4,6],
+    accion:"Pedir el soporte de las diez primeras. Un solo cero de más recuperado suele pagar la auditoría completa.",
+    nota:"Solo se evalúan proveedores con 8 o más transacciones, para que la mediana signifique algo. Factor 10%."
+  };
+}
+
+/* --- D8: montos redondos --- */
+function d8(tx){
+  const val = tx.filter(t => t.abs >= 1000);
+  if(val.length < 30) return null;
+  const base = val[0].abs > 100000 ? 10000 : 1000;
+  const redondos = val.filter(t => t.cents % (base * 100) === 0);
+  const share = redondos.length / val.length;
+  if(share < 0.06) return null;
+  const exp = redondos.reduce((s,t) => s + t.abs, 0);
+  const casos = redondos.slice()
+    .sort((a,b) => b.abs - a.abs).slice(0, 200)
+    .map(t => [t.prov, fdate(t.fecha), t.doc || "—", t.desc || t.cat || "—", money2(t.abs)]);
+  return {
+    id:"d8", sev:"info", titulo:"Concentración de montos perfectamente redondos",
+    que:"El " + (share*100).toFixed(1).replace(".", ",") + "% del gasto está en cifras exactas múltiplos de " + money(base) +
+        ". En una operación normal esa proporción ronda el 2–4%. Un exceso indica montos estimados, provisiones que nunca se ajustaron, igualas sin factura de respaldo o cargos negociados de palabra.",
+    exposicion: exp, factor: 0.03, recuperable: exp * 0.03,
+    cols: ["Proveedor","Fecha","Documento","Concepto","Monto"],
+    casos, nums: [4],
+    accion:"Verificar que cada uno tenga factura fiscal válida y contrato detrás. Los que no la tengan son riesgo tributario además de fuga.",
+    nota:"Factor 3%, aplicado solo como estimación de ajuste tras revisión documental."
+  };
+}
+
+/* --- D9: gasto disperso (tail spend) --- */
+function d9(tx){
+  const g = grupos(tx.filter(t => t.abs > 0), t => t.pk);
+  const provs = [];
+  let total = 0;
+  for(const [k, arr] of g){
+    const monto = arr.reduce((s,t) => s + t.abs, 0);
+    total += monto;
+    provs.push({nombre: arr[0].prov, n: arr.length, monto, cat: arr[0].cat});
+  }
+  provs.sort((a,b) => b.monto - a.monto);
+  const cola = provs.filter(p => p.n <= 2);
+  const expCola = cola.reduce((s,p) => s + p.monto, 0);
+  const top10 = provs.slice(0, 10).reduce((s,p) => s + p.monto, 0);
+  const casos = cola.slice(0, 200).map(p => [p.nombre, p.n, p.cat || "—", money2(p.monto)]);
+  return {
+    id:"d9", sev:"info", titulo:"Gasto disperso — proveedores de una o dos compras",
+    que: nf0.format(cola.length) + " de tus " + nf0.format(provs.length) + " proveedores te facturaron una o dos veces en todo el periodo y suman " +
+         money(expCola) + " (" + pct(expCola, total) + " del gasto). Ese dinero se compró sin comparar precios, sin contrato y con el costo administrativo de abrir un proveedor nuevo cada vez.",
+    exposicion: expCola, factor: 0.07, recuperable: expCola * 0.07,
+    cols: ["Proveedor","Compras","Categoría","Gasto"],
+    casos, nums: [3],
+    accion:"Agrupar por categoría, elegir dos o tres proveedores de referencia por familia y canalizar el resto por catálogo. Ahorro documentado en el mercado para gasto de cola: entre 5% y 12%.",
+    nota:"Factor 7%, punto medio del rango. Concentración actual: los 10 mayores proveedores representan " + pct(top10, total) + " del gasto.",
+    ctx: {total, provs: provs.length, top10}
+  };
+}
+
+/* --- D10: pagos en fin de semana --- */
+function d10(tx){
+  const conF = tx.filter(t => t.fecha && t.abs > 0);
+  if(conF.length < 50) return null;
+  const fin = conF.filter(t => { const d = t.fecha.getDay(); return d === 0 || d === 6; });
+  const share = fin.length / conF.length;
+  if(fin.length < 5 || share < 0.005) return null;
+  const exp = fin.reduce((s,t) => s + t.abs, 0);
+  const casos = fin.slice().sort((a,b) => b.abs - a.abs).slice(0, 150)
+    .map(t => [t.prov, fdate(t.fecha), ["domingo","","","","","","sábado"][t.fecha.getDay()] || "domingo", t.doc || "—", money2(t.abs)]);
+  return {
+    id:"d10", sev:"info", titulo:"Documentos registrados en fin de semana",
+    que: nf0.format(fin.length) + " asientos (" + (share*100).toFixed(1).replace(".", ",") + "% del total) tienen fecha de sábado o domingo, por " + money(exp) +
+         ". En una empresa que no opera fines de semana, esto apunta a fechas retroactivas, cargas masivas mal fechadas o registros hechos fuera del control normal.",
+    exposicion: exp, factor: 0, recuperable: 0,
+    cols: ["Proveedor","Fecha","Día","Documento","Monto"],
+    casos, nums: [4],
+    accion:"Contrastar con el calendario operativo. Si la empresa sí opera fines de semana, este hallazgo se descarta; si no, hay que revisar quién y cuándo registró.",
+    nota:"Hallazgo de control interno. No se cuantifica como recuperación."
+  };
+}
+
+/* --- D11: dispersión de precio unitario del mismo artículo --- */
+function d11(tx){
+  const val = tx.filter(t => t.item && isFinite(t.precio) && t.precio > 0);
+  if(val.length < 20) return null;
+  const g = grupos(val, t => normName(t.item));
+  const casos = [];
+  let exp = 0;
+  for(const [, arr] of g){
+    if(arr.length < 3) continue;
+    const precios = arr.map(t => t.precio);
+    const min = Math.min(...precios), max = Math.max(...precios);
+    if(min <= 0 || max / min < 1.15) continue;
+    let sobrecosto = 0;
+    for(const t of arr){
+      const q = isFinite(t.cant) && t.cant > 0 ? t.cant : 1;
+      sobrecosto += (t.precio - min) * q;
+    }
+    if(sobrecosto <= 0) continue;
+    exp += sobrecosto;
+    casos.push({v: sobrecosto, r: [
+      arr[0].item, arr.length,
+      Array.from(new Set(arr.map(t => t.prov))).length,
+      money2(min), money2(max),
+      ((max/min - 1) * 100).toFixed(0) + "%",
+      money2(sobrecosto)
+    ]});
+  }
+  if(!casos.length) return null;
+  casos.sort((a,b) => b.v - a.v);
+  return {
+    id:"d11", sev:"alta", titulo:"El mismo artículo comprado a precios distintos",
+    que:"Artículos idénticos pagados a precios que varían más de 15% entre compras o entre proveedores. El sobrecosto se calcula contra el mejor precio que la propia empresa ya consiguió — no contra un precio teórico de mercado.",
+    exposicion: exp, factor: 0.50, recuperable: exp * 0.50,
+    cols: ["Artículo","Compras","Proveedores","Precio mín.","Precio máx.","Variación","Sobrecosto"],
+    casos: casos.map(c => c.r), nums: [3,4,6],
+    accion:"Fijar precio de referencia por artículo y renegociar contra el mínimo histórico. Es el hallazgo más fácil de defender ante un proveedor: ya te vendió más barato antes.",
+    nota:"Factor 50%: parte de la diferencia se explica por volumen, urgencia o especificación, y no es recuperable."
+  };
+}
+
+/* ============================================================
+   8. EJECUCIÓN
+   ============================================================ */
+
+$("btnRun").onclick = () => {
+  showErr("err2", "");
+  const faltan = CAMPOS.filter(c => c.req && S.map[c.k] == null).map(c => c.n);
+  if(faltan.length) return showErr("err2", "Faltan campos obligatorios: " + faltan.join(", ") + ".");
+
+  setMoneda($("optCur").value);
+  const cli = $("optCli").value.trim();
+  const ventana = Math.max(1, parseInt($("optWin").value, 10) || 90);
+
+  const tx = construir();
+  if(tx.length < 5) return showErr("err2", "Solo pude interpretar " + tx.length + " transacciones con monto válido. Revisa que la columna de monto sea la correcta.");
+  S.tx = tx;
+
+  // umbral de aprobación
+  let thr = parseFloat($("optThr").value);
+  let thrAuto = false;
+  if(!isFinite(thr) || thr <= 0){
+    const ord = tx.map(t => t.abs).filter(v => v > 0).sort((a,b) => a-b);
+    const p90 = quantile(ord, 0.90);
+    const mag = Math.pow(10, Math.floor(Math.log10(Math.max(p90, 10))));
+    thr = Math.max(mag, Math.round(p90 / mag) * mag);
+    thrAuto = true;
+  }
+  S.cfg = {cli, ventana, thr, thrAuto};
+
+  // estadísticas base
+  const conF = tx.filter(t => t.fecha);
+  const fechas = conF.map(t => t.fecha.getTime());
+  const total = tx.reduce((s,t) => s + t.abs, 0);
+  const provs = new Set(tx.map(t => t.pk));
+  const desde = fechas.length ? new Date(Math.min(...fechas)) : null;
+  const hasta = fechas.length ? new Date(Math.max(...fechas)) : null;
+  const meses = (desde && hasta) ? Math.max(1, (hasta - desde) / 86400000 / 30.44) : 12;
+  S.stats = {total, n: tx.length, provs: provs.size, desde, hasta, meses};
+
+  // corre detectores
+  const out = [];
+  out.push(d1(tx));
+  out.push(d2(tx, ventana));
+  out.push(d3(tx));
+  out.push(d11(tx));
+  out.push(d5(tx));
+  out.push(d4(tx));
+  out.push(d6(tx, thr));
+  out.push(d7(tx));
+  out.push(d8(tx));
+  out.push(d9(tx));
+  out.push(d10(tx));
+
+  S.findings = out.filter(f => f && (f.casos.length || f.id === "d1"));
+  render();
+  goto(3);
+};
+
+/* ============================================================
+   9. INFORME
+   ============================================================ */
+
+const SEV_TXT = {alta:"Prioridad alta", media:"Prioridad media", info:"Contexto"};
+
+function render(){
+  const st = S.stats, cfg = S.cfg;
+  const conCasos = S.findings.filter(f => f.casos.length);
+  const recup = conCasos.reduce((s,f) => s + f.recuperable, 0);
+  const expo  = conCasos.reduce((s,f) => s + f.exposicion, 0);
+  const anual = recup / st.meses * 12;
+  const altas = conCasos.filter(f => f.sev === "alta");
+  const cajaRapida = altas.reduce((s,f) => s + f.recuperable, 0);
+
+  const periodo = (st.desde && st.hasta)
+    ? fdate(st.desde) + " – " + fdate(st.hasta) + "  ·  " + st.meses.toFixed(1).replace(".", ",") + " meses"
+    : "periodo no determinado (falta fecha válida)";
+
+  let h = "";
+
+  /* --- encabezado --- */
+  h += '<div class="rep-head">' +
+    '<div class="eyebrow">Heimdall Bridge · Auditoría de gasto</div>' +
+    '<h2>Informe de fugas detectadas' + (cfg.cli ? " — " + esc(cfg.cli) : "") + '</h2>' +
+    '<div class="rep-meta">' + esc(periodo) + '  ·  ' + nf0.format(st.n) + ' transacciones  ·  ' +
+      nf0.format(st.provs) + ' proveedores  ·  emitido ' + fdate(new Date()) + '</div>' +
+    '<div class="kpis">' +
+      kpi("Gasto analizado", money(st.total), nf0.format(st.n) + " documentos") +
+      kpi("Hallazgos con casos", nf0.format(conCasos.length) + " de 11", altas.length + " de prioridad alta") +
+      kpi("Recuperación estimada", money(recup), pct(recup, st.total) + " del gasto", true) +
+      kpi("Caja de acción inmediata", money(cajaRapida), "hallazgos de prioridad alta") +
+    '</div></div>';
+
+  /* --- resumen ejecutivo --- */
+  h += '<div class="summary"><h2 style="font-size:24px;margin-bottom:14px">Lo que encontramos</h2>' +
+    '<p>Analizamos <strong>' + nf0.format(st.n) + ' transacciones</strong> por <strong>' + money(st.total) +
+    '</strong> repartidas entre <strong>' + nf0.format(st.provs) + ' proveedores</strong>. ' +
+    'Once pruebas independientes arrojaron <strong>' + conCasos.length + ' hallazgos con casos concretos</strong>, ' +
+    'con una recuperación estimada de forma conservadora en <strong>' + money(recup) + '</strong> — el ' +
+    pct(recup, st.total) + ' del gasto revisado' +
+    (st.meses < 11 ? ', que al ritmo del periodo analizado equivale a ' + money(anual) + ' en doce meses' : '') + '.</p>';
+
+  if(altas.length){
+    h += '<p>De esos hallazgos, <strong>' + altas.length + ' son de prioridad alta</strong> (' +
+      altas.map(f => esc(f.titulo.toLowerCase())).join("; ") + ') y concentran <strong>' + money(cajaRapida) +
+      '</strong> de recuperación potencial. Son los que se atacan primero porque se demuestran con documentos que la empresa ya tiene.</p>';
+  } else {
+    h += '<p>No aparecieron hallazgos de prioridad alta. El resto de las observaciones son oportunidades de consolidación y control, no dinero perdido de forma inmediata.</p>';
+  }
+
+  h += '<p>El orden de trabajo recomendado es: primero los duplicados, que son caja recuperable en semanas; ' +
+    'después la limpieza del maestro de proveedores, que habilita la renegociación; y por último la consolidación del gasto disperso, ' +
+    'que es donde está el ahorro estructural del próximo año.</p></div>';
+
+  /* --- hallazgos --- */
+  const orden = {alta:0, media:1, info:2};
+  const lista = S.findings.slice().sort((a,b) =>
+    orden[a.sev] - orden[b.sev] || b.recuperable - a.recuperable);
+
+  for(const f of lista){
+    h += '<div class="finding">' +
+      '<div class="f-head"><div class="t"><div class="f-title"><h3>' + esc(f.titulo) + '</h3>' +
+        '<span class="sev ' + f.sev + '">' + SEV_TXT[f.sev] + '</span></div>' +
+        '<p class="f-desc">' + esc(f.que) + '</p></div>' +
+      '<div class="f-nums">' +
+        '<div class="f-num"><div class="k">Casos</div><div class="v">' + nf0.format(f.casos.length) + '</div></div>' +
+        '<div class="f-num"><div class="k">Exposición</div><div class="v">' + money(f.exposicion) + '</div></div>' +
+        '<div class="f-num"><div class="k">Recuperable</div><div class="v hi">' + money(f.recuperable) + '</div></div>' +
+      '</div></div>';
+
+    if(!f.casos.length){
+      h += '<div class="clean">Sin casos detectados en este periodo. Es una buena noticia y conviene decirlo: significa que este control específico está funcionando.</div>';
+    } else {
+      const top = f.casos.slice(0, 40);
+      h += '<div class="f-body"><div class="tblwrap"><table><thead><tr>' +
+        f.cols.map((c, i) => '<th' + (f.nums && f.nums.includes(i) ? ' style="text-align:right"' : '') + '>' + esc(c) + '</th>').join("") +
+        '</tr></thead><tbody>' +
+        top.map(r => '<tr>' + r.map((v, i) =>
+          '<td' + (f.nums && f.nums.includes(i) ? ' class="num"' : '') + '>' + esc(v) + '</td>').join("") + '</tr>').join("") +
+        '</tbody></table></div>';
+      if(f.casos.length > top.length){
+        h += '<div class="f-more">Mostrando los ' + top.length + ' casos de mayor monto. El detalle completo (' +
+          nf0.format(f.casos.length) + ' casos) está en el CSV exportable.</div>';
+      }
+      h += '</div>';
+    }
+    h += '<div class="f-foot"><b>Qué hacer:</b> ' + esc(f.accion) +
+      (f.nota ? ' <span style="color:#8a857c">— ' + esc(f.nota) + '</span>' : '') + '</div></div>';
+  }
+
+  /* --- metodología --- */
+  h += '<div class="method"><h3>Cómo se calcularon estas cifras</h3>' +
+    '<p>Cada hallazgo tiene dos números y conviene no confundirlos. La <b>exposición</b> es el dinero bruto involucrado en las transacciones señaladas. ' +
+    'El <b>recuperable</b> es la exposición multiplicada por un factor de conversión, que refleja qué proporción se convierte en caja o en ahorro real una vez validada la documentación.</p>' +
+    '<table><thead><tr><th>Hallazgo</th><th style="text-align:right">Exposición</th><th style="text-align:right">Factor</th><th style="text-align:right">Recuperable</th></tr></thead><tbody>' +
+    conCasos.map(f => '<tr><td>' + esc(f.titulo) + '</td><td class="num">' + money(f.exposicion) +
+      '</td><td class="num">' + (f.factor * 100).toFixed(0) + '%</td><td class="num">' + money(f.recuperable) + '</td></tr>').join("") +
+    '<tr style="font-weight:600;border-top:2px solid #C8C2B8"><td>Total recuperable</td><td class="num" style="color:#8a857c">no sumable</td>' +
+      '<td class="num">—</td><td class="num">' + money(recup) + '</td></tr>' +
+    '</tbody></table>' +
+    '<ul style="margin-top:16px">' +
+      '<li><b>Las exposiciones no se suman entre sí</b> y por eso la columna no lleva total: una misma factura puede aparecer en varias pruebas a la vez — por ejemplo, una compra fraccionada a un proveedor duplicado. Sumarlas daría una cifra inflada. El recuperable sí se totaliza, porque cada prueba apunta a una palanca distinta — cobrar un duplicado, renegociar un precio, consolidar un volumen — pero incluso así conviene leerlo como un orden de magnitud y no como una cifra exacta.</li>' +
+      '<li>Los factores son deliberadamente conservadores. Preferimos prometer de menos y entregar de más.</li>' +
+      '<li>Los montos se toman en valor absoluto, de modo que las notas de crédito registradas en negativo no cancelan la detección de un duplicado.</li>' +
+      '<li>Separador decimal detectado: <b>' + (S.dec === "," ? "coma" : "punto") + '</b>. Formato de fecha: <b>' +
+        (S.order === "MDY" ? "mes/día/año" : "día/mes/año") + '</b>.</li>' +
+      (S.descartes.sinMonto ? '<li>Se descartaron ' + nf0.format(S.descartes.sinMonto) + ' filas sin monto interpretable.</li>' : '') +
+      (S.descartes.sinFecha ? '<li>' + nf0.format(S.descartes.sinFecha) + ' filas no tenían fecha válida: quedan fuera de las pruebas que dependen del tiempo.</li>' : '') +
+      (S.descartes.negativos ? '<li>' + nf0.format(S.descartes.negativos) + ' filas tienen monto negativo (notas de crédito o reversos).</li>' : '') +
+    '</ul>' +
+    '<p class="disclaimer"><b>Alcance y límites.</b> Este informe se construye únicamente con el archivo entregado. ' +
+    'Los hallazgos son indicios estadísticos, no conclusiones contables: cada caso debe validarse contra el documento soporte y el estado de cuenta del proveedor antes de reclamar, ajustar o escalar. ' +
+    'Un duplicado señalado aquí puede resultar ser un pago parcial legítimo, y una cuenta bancaria compartida puede tener una explicación societaria válida. ' +
+    'La calidad del análisis depende de la calidad del dato de origen. Ninguna cifra de este informe constituye un compromiso de recuperación.</p>' +
+    '</div>';
+
+  $("report").innerHTML = h;
+}
+
+function kpi(k, v, s, hi){
+  return '<div class="kpi"><div class="k">' + esc(k) + '</div><div class="v' + (hi ? " hi" : "") + '">' +
+    esc(v) + '</div><div class="s">' + esc(s) + '</div></div>';
+}
+
+/* --- exportar casos --- */
+$("btnCsv").onclick = () => {
+  const q = v => '"' + String(v == null ? "" : v).replace(/"/g, '""') + '"';
+  const lines = [];
+  lines.push(["Hallazgo","Prioridad","Exposicion total","Recuperable estimado"].map(q).join(","));
+  for(const f of S.findings.filter(x => x.casos.length)){
+    lines.push([f.titulo, SEV_TXT[f.sev], Math.round(f.exposicion), Math.round(f.recuperable)].map(q).join(","));
+  }
+  lines.push("");
+  for(const f of S.findings.filter(x => x.casos.length)){
+    lines.push(q("=== " + f.titulo + " ==="));
+    lines.push(f.cols.map(q).join(","));
+    for(const r of f.casos) lines.push(r.map(q).join(","));
+    lines.push("");
+  }
+  const blob = new Blob(["﻿" + lines.join("\r\n")], {type:"text/csv;charset=utf-8"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "hallazgos-" + (S.cfg.cli ? S.cfg.cli.replace(/[^\w]+/g, "-").toLowerCase() + "-" : "") +
+    new Date().toISOString().slice(0,10) + ".csv";
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+};
+
+/* ============================================================
+   10. DATOS DE DEMOSTRACIÓN
+   ============================================================ */
+
+function generarDemo(){
+  // PRNG con semilla fija: la demo sale igual siempre, para poder ensayarla
+  let seed = 20260803;
+  const rnd = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+  const pick = a => a[Math.floor(rnd() * a.length)];
+  const ent = (a, b) => Math.floor(a + rnd() * (b - a + 1));
+
+  const cats = ["Alimentos y bebidas","Mantenimiento","Lavandería","Amenidades","Combustible",
+                "Servicios profesionales","Suministros de oficina","Uniformes","Jardinería","Transporte","Seguridad","Piscina y químicos"];
+
+  const base = [
+    ["Distribuidora Caribe SRL","Alimentos y bebidas",130,"131-00842-3","8210044571"],
+    ["Suplidora Bávaro S.A.","Alimentos y bebidas",95,"101-55231-9","8210099213"],
+    ["Frigorífico del Este SRL","Alimentos y bebidas",60,"130-44112-7","8210077341"],
+    ["Ferretería Higüey C. por A.","Mantenimiento",120,"101-22334-1","8210033120"],
+    ["Clima Total Servicios SRL","Mantenimiento",44,"131-99001-2","8210066554"],
+    ["Lavandería Industrial Punta Cana","Lavandería",26,"130-77220-4","8210011889"],
+    ["Amenities Premium SRL","Amenidades",38,"131-11223-8","8210055002"],
+    ["Combustibles del Este S.A.","Combustible",52,"101-88776-5","8210088776"],
+    ["Consultores Peña & Asociados","Servicios profesionales",14,"130-12009-6","8210022445"],
+    ["Papelería Nacional SRL","Suministros de oficina",70,"131-34567-0","8210044111"],
+    ["Uniformes del Caribe SRL","Uniformes",18,"130-90012-3","8210099887"],
+    ["Jardines Tropicales SRL","Jardinería",24,"131-45678-9","8210077009"],
+    ["Transporte Turístico Anamuya","Transporte",30,"101-33445-2","8210066123"],
+    ["Seguridad Vigía SRL","Seguridad",13,"130-55667-8","8210012340"],
+    ["Químicos y Piscinas RD SRL","Piscina y químicos",34,"131-66778-1","8210033456"],
+    ["Refrigeración Anamuya SRL","Mantenimiento",28,"130-22110-5","8210044789"],
+    ["Importadora Verón S.A.","Alimentos y bebidas",41,"101-77889-4","8210055443"],
+    ["Electro Servicios Macao SRL","Mantenimiento",22,"131-88990-7","8210066987"]
+  ];
+
+  const rows = [["Fecha","Proveedor","RNC","No. Factura","Concepto","Categoria","Cuenta Banco","Monto"]];
+  const y0 = 2025, m0 = 8;                 // ago-2025 a jul-2026
+  const ymd = (mo, d) => {
+    const total = m0 - 1 + mo;
+    const yy = y0 + Math.floor(total / 12), mm = (total % 12) + 1;
+    const dd = Math.min(d, [31,28,31,30,31,30,31,31,30,31,30,31][mm-1]);
+    return [yy, mm, dd];
+  };
+  const fmt = (yy, mm, dd) =>
+    String(dd).padStart(2,"0") + "/" + String(mm).padStart(2,"0") + "/" + yy;
+  // la operación normal no registra en fin de semana: corre el día al lunes siguiente
+  const fecha = (mo, d) => {
+    let [yy, mm, dd] = ymd(mo, d);
+    let g = new Date(yy, mm-1, dd).getDay();
+    while(g === 0 || g === 6){ dd = dd >= 28 ? dd - 2 : dd + 1; g = new Date(yy, mm-1, dd).getDay(); }
+    return fmt(yy, mm, dd);
+  };
+  // …salvo los asientos que plantamos a propósito en sábado o domingo
+  const fechaFinde = (mo, d) => {
+    let [yy, mm, dd] = ymd(mo, d);
+    let g = new Date(yy, mm-1, dd).getDay();
+    let intentos = 0;
+    while(g !== 0 && g !== 6 && intentos++ < 8){ dd = dd >= 27 ? dd - 1 : dd + 1; g = new Date(yy, mm-1, dd).getDay(); }
+    return fmt(yy, mm, dd);
+  };
+  const monto = n => n.toLocaleString("en-US", {minimumFractionDigits:2, maximumFractionDigits:2}).replace(/,/g, ".").replace(/\.(\d{2})$/, ",$1");
+  // ↑ formato dominicano con punto de miles y coma decimal, para probar el parser
+
+  let folio = 10000;
+  const push = t =>
+    rows.push([(t.finde ? fechaFinde : fecha)(t.mo, t.d), t.prov, t.rnc, t.doc, t.con, t.cat, t.cta, monto(t.m)]);
+
+  const conceptos = {
+    "Alimentos y bebidas":["Suministro semanal","Carnes y embutidos","Frutas y vegetales","Lácteos","Bebidas"],
+    "Mantenimiento":["Mantenimiento preventivo","Repuestos A/A","Reparación bomba","Materiales eléctricos"],
+    "Lavandería":["Servicio de lavandería","Lavado de blancos"],
+    "Amenidades":["Amenidades habitación","Jabonería y kits"],
+    "Combustible":["Diésel planta","Gasolina flotilla"],
+    "Servicios profesionales":["Honorarios mensuales","Asesoría laboral"],
+    "Suministros de oficina":["Papelería","Tóner y consumibles"],
+    "Uniformes":["Uniformes de servicio","Calzado de seguridad"],
+    "Jardinería":["Mantenimiento de áreas verdes","Plantas y sustrato"],
+    "Transporte":["Traslados de personal","Servicio de shuttle"],
+    "Seguridad":["Servicio de vigilancia","Monitoreo CCTV"],
+    "Piscina y químicos":["Cloro y químicos","Mantenimiento de piscina"]
+  };
+
+  const tx = [];
+  for(const [nombre, cat, n, rnc, cta] of base){
+    const escala = ent(18000, 260000);
+    for(let k = 0; k < n; k++){
+      const mo = ent(1, 12), d = ent(1, 28);
+      const m = Math.round(escala * (0.45 + rnd() * 1.5) * 100) / 100;
+      tx.push({mo, d, prov: nombre, rnc, doc: "FAC-" + (++folio), con: pick(conceptos[cat] || ["Compra"]), cat, cta, m});
+    }
+  }
+
+  // --- anomalías plantadas ---
+  const dup = [];
+
+  // A) duplicados exactos: mismo folio, mismo monto, días después
+  for(let k = 0; k < 9; k++){
+    const t = tx[ent(0, tx.length - 1)];
+    dup.push({...t, d: Math.min(28, t.d + ent(2, 9))});
+  }
+  // B) duplicados probables: mismo monto, folio distinto
+  for(let k = 0; k < 14; k++){
+    const t = tx[ent(0, tx.length - 1)];
+    dup.push({...t, doc: "FAC-" + (++folio), d: Math.min(28, t.d + ent(3, 20))});
+  }
+  // C) mismo folio, monto distinto
+  for(let k = 0; k < 5; k++){
+    const t = tx[ent(0, tx.length - 1)];
+    dup.push({...t, m: Math.round(t.m * (0.3 + rnd() * 0.4) * 100) / 100, d: Math.min(28, t.d + ent(1, 6))});
+  }
+  // D) variantes del maestro de proveedores
+  const variantes = [
+    ["Distribuidora Caribe, S.R.L.","131-00842-3","8210044571","Alimentos y bebidas"],
+    ["DISTRIBUIDORA CARIBE SRL","131008423","8210044571","Alimentos y bebidas"],
+    ["Ferreteria Higuey CxA","101-22334-1","8210033120","Mantenimiento"],
+    ["Clima Total Servicios S. R. L.","131-99001-2","8210066554","Mantenimiento"],
+    ["Quimicos y Piscinas RD, SRL","131-66778-1","8210033456","Piscina y químicos"]
+  ];
+  for(const [nombre, rnc, cta, cat] of variantes){
+    for(let k = 0; k < ent(6, 13); k++){
+      tx.push({mo: ent(1,12), d: ent(1,28), prov: nombre, rnc, doc: "FAC-" + (++folio),
+               con: pick(conceptos[cat] || ["Compra"]), cat, cta, m: Math.round(ent(22000, 190000) + rnd()*100) });
+    }
+  }
+  // E) proveedor fantasma que comparte cuenta bancaria
+  for(let k = 0; k < 7; k++){
+    tx.push({mo: ent(3,12), d: ent(1,28), prov: "Servicios Generales JRM SRL", rnc: "131-77003-9",
+             doc: "FAC-" + (++folio), con: "Servicios varios", cat: "Mantenimiento",
+             cta: "8210066554", m: Math.round(ent(85000, 340000)) });
+  }
+  // F) fraccionamiento: 4 facturas en una semana justo bajo el umbral
+  for(let b = 0; b < 5; b++){
+    const mo = ent(2, 12), d0 = ent(2, 20);
+    for(let k = 0; k < 4; k++){
+      tx.push({mo, d: d0 + k, prov: "Suplidora Bávaro S.A.", rnc: "101-55231-9", doc: "FAC-" + (++folio),
+               con: "Suministro urgente", cat: "Alimentos y bebidas", cta: "8210099213",
+               m: Math.round(ent(180000, 245000)) });
+    }
+  }
+  // G) outlier con un cero de más
+  for(let k = 0; k < 4; k++){
+    const t = tx[ent(0, tx.length - 1)];
+    tx.push({...t, doc: "FAC-" + (++folio), d: ent(1,28), m: Math.round(t.m * 10) });
+  }
+  // H) montos redondos y cola larga de proveedores de una sola compra
+  const cola = ["Servicios Rápidos EIRL","Taller Mecánico Los Cocos","Rótulos y Vinil RD","Fumigadora Bávaro",
+    "Cristalería del Este","Suministros Médicos MG","Alquiler de Equipos Verón","Imprenta La Altagracia",
+    "Refrigerantes JC","Textiles Anamuya","Cerrajería 24H","Plomería Express RD","Vidriería Macao",
+    "Tapicería Don Luis","Electrodomésticos Higüey","Purificadora Aqua","Muebles y Diseño RD",
+    "Sistemas Contra Incendio SD","Publicidad Costa Este","Insumos Gastronómicos MG","Herrería Bávaro",
+    "Aires del Caribe","Limpieza Profunda RD","Control de Plagas Este","Suministro Eléctrico Verón",
+    "Decoraciones Coral","Audio y Video PC","Repuestos Náuticos","Servicio Técnico Cocina","Toldos y Lonas RD"];
+  cola.forEach((nombre, i) => {
+    const veces = i % 5 === 0 ? 2 : 1;
+    for(let k = 0; k < veces; k++){
+      const redondo = i % 3 === 0;
+      tx.push({mo: ent(1,12), d: ent(1,28), prov: nombre, rnc: "13" + ent(0,9) + "-" + ent(10000,99999) + "-" + ent(1,9),
+               doc: redondo ? "" : "FAC-" + (++folio), con: "Servicio puntual", cat: pick(cats),
+               cta: "82100" + ent(10000, 99999),
+               m: redondo ? ent(15, 90) * 5000 : Math.round(ent(28000, 420000)) });
+    }
+  });
+  // I) algunos asientos registrados en fin de semana
+  for(let k = 0; k < 18; k++){
+    const t = tx[ent(0, tx.length - 1)];
+    tx.push({...t, doc: "FAC-" + (++folio), d: ent(1, 26), m: Math.round(t.m), finde: true });
+  }
+
+  const todo = tx.concat(dup);
+  // desordena para que no se note el orden de generación
+  for(let i = todo.length - 1; i > 0; i--){
+    const j = Math.floor(rnd() * (i + 1));
+    [todo[i], todo[j]] = [todo[j], todo[i]];
+  }
+  for(const t of todo) push(t);
+
+  return rows.map(r => r.map(c => /[",;]/.test(String(c)) ? '"' + String(c).replace(/"/g, '""') + '"' : c).join(";")).join("\n");
+}
+</script>
+</body>
+</html>

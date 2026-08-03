@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Calculadora de fuga de gasto | Heimdall Bridge</title>
+<meta name="description" content="Seis preguntas y una estimación de cuánto dinero se está yendo por compras y cuentas por pagar en tu empresa cada año.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,400&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --navy:#1A2D4A; --navy-deep:#0d1726; --navy2:#243d5f; --teal:#005F65;
+  --teal2:#008089; --gold:#8A6010; --gold2:#C49A30; --cream:#F4F1EB;
+  --warm:#EDE9E2; --mid:#C8C2B8; --dark:#1A1612; --white:#fff;
+  --serif:'Cormorant Garamond',Georgia,serif;
+  --sans:'DM Sans',system-ui,sans-serif;
+  --mono:'DM Mono',ui-monospace,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{font-family:var(--sans);background:var(--cream);color:var(--dark);font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1060px;margin:0 auto;padding:0 24px}
+a{color:inherit}
+
+nav{background:var(--navy-deep);border-bottom:1px solid rgba(255,255,255,.08)}
+nav .wrap{display:flex;align-items:center;justify-content:space-between;height:62px;gap:16px}
+.logo{font-family:var(--serif);font-size:21px;color:var(--cream);text-decoration:none;white-space:nowrap}
+.logo span{color:var(--gold2)}
+nav a.back{font-size:13.5px;color:var(--mid);text-decoration:none}
+nav a.back:hover{color:var(--gold2)}
+
+header{padding:clamp(46px,7vw,76px) 0 34px}
+.eyebrow{font-family:var(--mono);font-size:10.5px;letter-spacing:.24em;text-transform:uppercase;color:var(--teal)}
+h1{font-family:var(--serif);font-weight:400;font-size:clamp(32px,5.2vw,54px);line-height:1.06;letter-spacing:-.015em;color:var(--navy);margin-top:18px;max-width:17ch}
+header p{font-size:clamp(16px,1.8vw,19px);color:#4a4640;margin-top:20px;max-width:58ch}
+
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:34px;align-items:start;padding-bottom:80px}
+@media(max-width:900px){.grid{grid-template-columns:1fr}}
+
+/* ---------- formulario ---------- */
+.form{background:var(--white);border:1px solid var(--warm);padding:30px 30px 34px}
+.q{padding:20px 0;border-bottom:1px solid var(--warm)}
+.q:first-child{padding-top:0}
+.q:last-child{border-bottom:0;padding-bottom:0}
+.q label{display:block;font-size:15px;font-weight:500;color:var(--navy);margin-bottom:4px}
+.q .help{font-size:12.5px;color:#8a857c;margin-bottom:12px;line-height:1.45}
+.q input[type=number],.q select{width:100%;padding:12px 14px;border:1px solid var(--warm);border-radius:3px;font-family:var(--sans);font-size:15px;background:var(--cream);color:var(--dark)}
+.q input[type=number]:focus,.q select:focus{outline:none;border-color:var(--teal);background:var(--white)}
+.q input[type=range]{width:100%;accent-color:var(--teal);margin-top:6px}
+.rangeval{font-family:var(--mono);font-size:19px;color:var(--navy);margin-bottom:2px}
+.rangeval small{font-size:11px;color:#8a857c;letter-spacing:.08em}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{flex:1;min-width:92px;padding:11px 10px;border:1px solid var(--warm);background:var(--cream);border-radius:3px;font-family:var(--sans);font-size:13px;cursor:pointer;text-align:center;transition:.15s;color:#5a554d;line-height:1.3}
+.chip:hover{border-color:var(--mid)}
+.chip.on{background:var(--navy);border-color:var(--navy);color:var(--cream)}
+
+/* ---------- resultado ---------- */
+.res{position:sticky;top:24px}
+.card{background:var(--navy);color:var(--cream);padding:34px 32px}
+.card .eyebrow{color:var(--gold2)}
+.big{font-family:var(--serif);font-size:clamp(40px,6vw,58px);line-height:1;color:var(--gold2);margin-top:16px}
+.range{font-family:var(--mono);font-size:12.5px;color:var(--mid);margin-top:12px;letter-spacing:.03em}
+.card .pctline{font-size:14px;color:#c3cbd6;margin-top:16px;padding-top:16px;border-top:1px solid rgba(255,255,255,.14)}
+.card .pctline b{color:var(--white)}
+
+.bars{background:var(--white);border:1px solid var(--warm);border-top:0;padding:26px 30px}
+.bars h3{font-size:13px;font-family:var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--navy);font-weight:500;margin-bottom:18px}
+.bar{margin-bottom:18px}
+.bar:last-child{margin-bottom:0}
+.bar .t{display:flex;justify-content:space-between;gap:14px;font-size:14px;margin-bottom:7px;align-items:baseline}
+.bar .t b{font-family:var(--mono);font-size:14.5px;color:var(--navy);white-space:nowrap}
+.bar .track{height:7px;background:var(--warm);border-radius:99px;overflow:hidden}
+.bar .fill{height:100%;border-radius:99px;transition:width .45s cubic-bezier(.2,.7,.3,1)}
+.bar .d{font-size:12px;color:#8a857c;margin-top:6px;line-height:1.45}
+
+.verdict{background:var(--warm);border:1px solid var(--mid);border-top:0;padding:24px 30px;font-size:14.5px;color:#4a4640;line-height:1.6}
+.verdict b{color:var(--navy)}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:22px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:9px;font-size:14.5px;font-weight:500;padding:14px 24px;border-radius:3px;border:1px solid var(--navy);background:var(--navy);color:var(--cream);cursor:pointer;transition:.18s;text-decoration:none;font-family:var(--sans);line-height:1.2;text-align:center}
+.btn:hover{background:var(--navy2);border-color:var(--navy2)}
+.btn.gold{background:var(--gold);border-color:var(--gold)}
+.btn.gold:hover{background:var(--gold2);border-color:var(--gold2)}
+.btn.ghost{background:none;color:var(--navy)}
+.btn.ghost:hover{background:var(--warm)}
+
+.method{margin-top:34px;padding:24px 28px;background:var(--white);border:1px solid var(--warm);font-size:13px;color:#6b665e;line-height:1.62}
+.method h3{font-size:14px;color:var(--navy);margin-bottom:10px;font-family:var(--sans);font-weight:600}
+.method b{color:var(--navy)}
+.method ul{margin:10px 0 0 17px}
+.method li{margin-bottom:6px}
+
+footer{background:var(--navy-deep);color:var(--mid);padding:40px 0;font-size:13px}
+footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
+footer a{color:var(--gold2);text-decoration:none}
+.toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(20px);background:var(--navy);color:var(--cream);padding:13px 24px;border-radius:3px;font-size:14px;opacity:0;pointer-events:none;transition:.28s;z-index:99}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+
+<nav><div class="wrap">
+  <a class="logo" href="/">Heimdall <span>Bridge</span></a>
+  <a class="back" href="index.html">← Volver a Radar 14</a>
+</div></nav>
+
+<header><div class="wrap">
+  <div class="eyebrow">Calculadora de fuga</div>
+  <h1>¿Cuánto se te está yendo cada año?</h1>
+  <p>Seis preguntas. La estimación se actualiza mientras respondes. No pedimos correo, no guardamos nada — el cálculo ocurre en tu propio navegador.</p>
+</div></header>
+
+<div class="wrap"><div class="grid">
+
+  <!-- ---------- formulario ---------- -->
+  <div class="form">
+    <div class="q">
+      <label for="compra">¿Cuánto le compras a proveedores al año?</label>
+      <div class="help">Todo lo que sale hacia terceros: mercancía, servicios, mantenimiento, suministros. Sin incluir nómina ni impuestos.</div>
+      <div class="rangeval" id="vCompra">US$ 3,000,000</div>
+      <input type="range" id="compra" min="200000" max="30000000" step="100000" value="3000000">
+    </div>
+
+    <div class="q">
+      <label for="provs">¿Cuántos proveedores distintos te facturaron el año pasado?</label>
+      <div class="help">Si no lo sabes con exactitud, un aproximado sirve. Casi siempre son más de los que uno cree.</div>
+      <div class="rangeval" id="vProvs">180 <small>proveedores</small></div>
+      <input type="range" id="provs" min="10" max="1200" step="5" value="180">
+    </div>
+
+    <div class="q">
+      <label>¿Concilian los estados de cuenta de proveedores contra su auxiliar de cuentas por pagar?</label>
+      <div class="help">Factura por factura, no solo el saldo total.</div>
+      <div class="chips" data-k="concilia">
+        <button class="chip" data-v="0">Nunca</button>
+        <button class="chip on" data-v="1">De vez en cuando</button>
+        <button class="chip" data-v="2">Todos los meses</button>
+      </div>
+    </div>
+
+    <div class="q">
+      <label>¿El sistema impide registrar dos veces la misma factura?</label>
+      <div class="help">Un bloqueo automático por número de documento y proveedor.</div>
+      <div class="chips" data-k="bloqueo">
+        <button class="chip" data-v="0">No</button>
+        <button class="chip on" data-v="1">No estoy seguro</button>
+        <button class="chip" data-v="2">Sí, bloquea</button>
+      </div>
+    </div>
+
+    <div class="q">
+      <label>¿Qué parte de las compras pasa por comparación de al menos dos cotizaciones?</label>
+      <div class="help">Excluye las compras de emergencia y las que solo tienen un proveedor posible.</div>
+      <div class="chips" data-k="cotiza">
+        <button class="chip on" data-v="0">Casi ninguna</button>
+        <button class="chip" data-v="1">Algunas</button>
+        <button class="chip" data-v="2">La mayoría</button>
+      </div>
+    </div>
+
+    <div class="q">
+      <label for="moneda">Moneda en la que quieres ver el resultado</label>
+      <select id="moneda">
+        <option value="US$|1">US$ — dólar</option>
+        <option value="RD$|60">RD$ — peso dominicano (1 US$ ≈ 60)</option>
+        <option value="$|950">$ — peso chileno (1 US$ ≈ 950)</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- ---------- resultado ---------- -->
+  <div class="res">
+    <div class="card">
+      <div class="eyebrow">Fuga anual estimada</div>
+      <div class="big" id="total">US$ 118,000</div>
+      <div class="range" id="rango">rango probable: US$ 77,000 – US$ 160,000</div>
+      <div class="pctline" id="pctline">Equivale al <b>3,9%</b> de tu compra anual — <b>US$ 9,800</b> cada mes.</div>
+    </div>
+
+    <div class="bars">
+      <h3>De dónde sale ese número</h3>
+      <div class="bar">
+        <div class="t"><span>Pagos duplicados y errores de captura</span><b id="n1">—</b></div>
+        <div class="track"><div class="fill" id="b1" style="background:#8E2C2C;width:0"></div></div>
+        <div class="d" id="d1"></div>
+      </div>
+      <div class="bar">
+        <div class="t"><span>Gasto disperso sin consolidar</span><b id="n2">—</b></div>
+        <div class="track"><div class="fill" id="b2" style="background:var(--gold2);width:0"></div></div>
+        <div class="d" id="d2"></div>
+      </div>
+      <div class="bar">
+        <div class="t"><span>Precios sin renegociar</span><b id="n3">—</b></div>
+        <div class="track"><div class="fill" id="b3" style="background:var(--teal2);width:0"></div></div>
+        <div class="d" id="d3"></div>
+      </div>
+    </div>
+
+    <div class="verdict" id="verdict"></div>
+
+    <div class="actions">
+      <a class="btn gold" id="mailto" href="#">Reservar el diagnóstico gratuito</a>
+      <button class="btn ghost" id="copiar">Copiar resumen</button>
+    </div>
+
+    <div class="method">
+      <h3>Cómo se calcula esto — y qué no es</h3>
+      <p>Esta calculadora <b>no ve tus datos</b>. Aplica rangos de referencia de auditoría de compras sobre las respuestas que diste, y por eso entrega un rango y no una cifra.</p>
+      <ul>
+        <li><b>Duplicados:</b> entre 0,05% y 0,4% de la compra anual según existan o no bloqueo automático y conciliación mensual. Es el rango que reporta la literatura de recuperación de cuentas por pagar.</li>
+        <li><b>Gasto disperso:</b> la porción del gasto que queda en la cola larga se estima a partir de cuánto le compras en promedio a cada proveedor — mientras más bajo ese promedio, más larga la cola — y sobre ella se aplica un ahorro por consolidación de 4% a 8%.</li>
+        <li><b>Precios:</b> entre 0,5% y 1,5% sobre el gasto concentrado, según cuánto se cotice hoy.</li>
+      </ul>
+      <p style="margin-top:12px">La única forma de saber tu número real es mirar tus transacciones una por una. Eso es exactamente lo que hace <a href="index.html" style="color:var(--teal)">Radar 14</a>, y por eso lleva garantía: si el análisis sobre tus datos reales no encuentra al menos tres veces lo que cuesta, no lo pagas.</p>
+    </div>
+  </div>
+
+</div></div>
+
+<footer><div class="wrap">
+  <div>Heimdall Bridge Consulting · <a href="mailto:hola@heimdallbridge.com">hola@heimdallbridge.com</a></div>
+  <div>Punta Cana, RD · Santiago, Chile</div>
+</div></footer>
+
+<div class="toast" id="toast">Resumen copiado</div>
+
+<script>
+"use strict";
+
+const $ = id => document.getElementById(id);
+const st = {compra:3000000, provs:180, concilia:1, bloqueo:1, cotiza:0, cur:"US$", fx:1};
+
+/* --- entradas --- */
+$("compra").oninput = e => { st.compra = +e.target.value; calc(); };
+$("provs").oninput  = e => { st.provs  = +e.target.value; calc(); };
+$("moneda").onchange = e => {
+  const [cur, fx] = e.target.value.split("|");
+  st.cur = cur; st.fx = +fx; calc();
+};
+document.querySelectorAll(".chips").forEach(g => {
+  g.querySelectorAll(".chip").forEach(c => {
+    c.onclick = () => {
+      g.querySelectorAll(".chip").forEach(x => x.classList.remove("on"));
+      c.classList.add("on");
+      st[g.dataset.k] = +c.dataset.v;
+      calc();
+    };
+  });
+});
+
+/* --- formato --- */
+const LOC = {"US$":"en-US", "RD$":"es-DO", "$":"es-CL"};
+function fmt(usd){
+  const v = usd * st.fx;
+  const n = new Intl.NumberFormat(LOC[st.cur] || "en-US", {maximumFractionDigits:0});
+  // redondeo a 2 cifras significativas para no fingir precisión que no existe
+  const mag = Math.pow(10, Math.max(0, Math.floor(Math.log10(Math.max(v, 1))) - 2));
+  return st.cur + " " + n.format(Math.round(v / mag) * mag);
+}
+const pct1 = x => (x * 100).toFixed(1).replace(".", ",") + "%";
+
+/* --- modelo --- */
+function modelo(){
+  const c = st.compra;
+
+  // 1. duplicados: la tasa base la fija el bloqueo automático; la conciliación
+  //    determina cuánto de lo que se cuela llega a detectarse y corregirse solo.
+  const baseDup = [0.0040, 0.0022, 0.0007][st.bloqueo];
+  const ajConc  = [1.30, 1.00, 0.62][st.concilia];
+  const dup = c * baseDup * ajConc;
+
+  // 2. gasto disperso: lo determina cuánto se le compra en promedio a cada proveedor.
+  //    Mientras más bajo ese promedio, más larga la cola de compras que nadie comparó.
+  const porProveedor = c / Math.max(st.provs, 1);
+  const colaShare = Math.min(0.30, Math.max(0.06, 0.34 - 0.055 * Math.log(porProveedor / 1000)));
+  const ahorroCola = [0.08, 0.06, 0.04][st.cotiza];
+  const cola = c * colaShare * ahorroCola;
+
+  // 3. precios en el gasto concentrado
+  const ahorroCore = [0.015, 0.010, 0.005][st.cotiza];
+  const core = c * (1 - colaShare) * ahorroCore;
+
+  const total = dup + cola + core;
+  return {dup, cola, core, total, colaShare, porProveedor,
+          bajo: total * 0.65, alto: total * 1.35};
+}
+
+/* --- render --- */
+function calc(){
+  $("vCompra").textContent = fmt(st.compra);
+  $("vProvs").innerHTML = new Intl.NumberFormat("es-DO").format(st.provs) + ' <small>proveedores</small>';
+
+  const m = modelo();
+  $("total").textContent = fmt(m.total);
+  $("rango").textContent = "rango probable: " + fmt(m.bajo) + " – " + fmt(m.alto);
+  $("pctline").innerHTML = "Equivale al <b>" + pct1(m.total / st.compra) +
+    "</b> de tu compra anual — <b>" + fmt(m.total / 12) + "</b> cada mes.";
+
+  const max = Math.max(m.dup, m.cola, m.core, 1);
+  const set = (i, val, txt) => {
+    $("n" + i).textContent = fmt(val);
+    $("b" + i).style.width = (val / max * 100) + "%";
+    $("d" + i).textContent = txt;
+  };
+  set(1, m.dup, [
+    "Sin bloqueo automático, la misma factura entra dos veces más seguido de lo que parece.",
+    "Con un bloqueo que nadie ha verificado, lo prudente es asumir que algo pasa.",
+    "El bloqueo reduce mucho el riesgo, pero no elimina el pago por dos vías distintas."
+  ][st.bloqueo]);
+  set(2, m.cola, "Le compras en promedio " + fmt(m.porProveedor) + " al año a cada proveedor. " +
+    "Con esa dispersión, cerca del " + pct1(m.colaShare) + " del gasto queda repartido en proveedores pequeños que rara vez se comparan.");
+  set(3, m.core, [
+    "Casi nada se cotiza contra un segundo proveedor: el precio lo pone el proveedor, no tú.",
+    "Se cotiza a veces. El margen suele estar en lo que se renueva por costumbre.",
+    "Ya cotizan bien. Aun así, el precio de lo recurrente se revisa menos de lo que debería."
+  ][st.cotiza]);
+
+  // veredicto
+  const RADAR = 1850;
+  const ratio = m.total / RADAR;
+  let v;
+  if(st.compra < 400000){
+    v = "<b>Con este volumen de compra, todavía no vale la pena contratar una auditoría.</b> " +
+        "La fuga existe, pero es más barato instalar dos controles simples que pagar por buscarla. " +
+        "Escríbenos igual: en la llamada de 45 minutos te decimos cuáles son esos dos controles, sin costo.";
+  } else if(ratio < 4){
+    v = "<b>Estás en el límite.</b> La fuga estimada es de " + fmt(m.total) +
+        " al año, unas " + ratio.toFixed(1).replace(".", ",") + " veces lo que cuesta Radar 14. " +
+        "Vale la pena hacer el diagnóstico gratuito antes de decidir: si al ver tu caso no creemos poder cumplir la garantía, te lo decimos ahí mismo.";
+  } else {
+    const sem = Math.max(1, Math.round(RADAR / (m.total / 52)));
+    v = "<b>Aquí hay caso.</b> Con esta estimación, lo que se fuga en " +
+        (sem === 1 ? "una sola semana" : "unas " + sem + " semanas") +
+        " ya cubre el costo completo de Radar 14. " +
+        "Y aun si la estimación estuviera exagerada al triple, seguiría alcanzando de sobra para la garantía de 3×.";
+  }
+  $("verdict").innerHTML = v;
+
+  // enlace de correo con el resumen ya escrito
+  const cuerpo =
+    "Hola, hice la estimación en la calculadora y quiero reservar el diagnóstico de 45 minutos.\n\n" +
+    "Compra anual: " + fmt(st.compra) + "\n" +
+    "Proveedores activos: " + st.provs + "\n" +
+    "Conciliación de estados de cuenta: " + ["nunca","de vez en cuando","todos los meses"][st.concilia] + "\n" +
+    "Bloqueo de facturas duplicadas: " + ["no","no está seguro","sí"][st.bloqueo] + "\n" +
+    "Compras con cotización comparada: " + ["casi ninguna","algunas","la mayoría"][st.cotiza] + "\n\n" +
+    "Fuga anual estimada: " + fmt(m.total) + " (rango " + fmt(m.bajo) + " – " + fmt(m.alto) + ")\n\n" +
+    "Empresa: \nTeléfono: \n";
+  $("mailto").href = "mailto:hola@heimdallbridge.com?subject=" +
+    encodeURIComponent("Diagnóstico Radar 14 — fuga estimada " + fmt(m.total)) +
+    "&body=" + encodeURIComponent(cuerpo);
+  $("copiar").dataset.txt = cuerpo;
+}
+
+$("copiar").onclick = async () => {
+  const t = $("copiar").dataset.txt || "";
+  try { await navigator.clipboard.writeText(t); }
+  catch(e){
+    const ta = document.createElement("textarea");
+    ta.value = t; document.body.appendChild(ta); ta.select();
+    document.execCommand("copy"); ta.remove();
+  }
+  const el = $("toast");
+  el.classList.add("on");
+  setTimeout(() => el.classList.remove("on"), 1900);
+};
+
+calc();
+</script>
+</body>
+</html>
