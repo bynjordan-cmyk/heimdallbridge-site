@@ -4,12 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Heimdall Bridge Consulting</title>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{
-  --navy:#1A2D4A; --navy-deep:#0d1726; --navy2:#243d5f; --teal:#005F65;
-  --teal2:#008089; --gold:#8A6010; --gold2:#C49A30; --cream:#F4F1EB;
-  --warm:#EDE9E2; --mid:#C8C2B8; --dark:#1A1612; --white:#fff;
+  /* Paleta compartida HBC/Zaldum: azul marino, dorado y superficies claras. */
+  --navy:#122b50; --navy-deep:#f8fafc; --navy2:#edf3fa; --teal:#c9a227;
+  --teal2:#d9ac45; --gold:#c9a227; --gold2:#d9ac45; --cream:#f7f5f0;
+  --warm:#edf3fa; --mid:#b5c6d9; --dark:#16222e; --white:#122b50;
 }
 *{margin:0;padding:0;box-sizing:border-box;}
 html{scroll-behavior:smooth;}
@@ -203,7 +204,7 @@ nav.visible{opacity:1;transform:translateY(0);}
 .contact-note{margin-top:20px;font-size:13px;color:rgba(255,255,255,0.3);font-style:italic;}
 
 /* ════ FOOTER ════ */
-footer{background:#080f1a;padding:36px 56px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px;}
+footer{background:#f8fafc;padding:36px 56px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px;}
 footer img{height:26px;filter:brightness(0) invert(1);opacity:0.6;}
 .footer-text{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:rgba(255,255,255,0.25);}
 
@@ -223,6 +224,69 @@ footer img{height:26px;filter:brightness(0) invert(1);opacity:0.6;}
   .detail-overlay{padding:60px 24px;}
   .detail-close{top:20px;right:24px;}
   footer{padding:28px 24px;}
+}
+
+/* Identidad de producto alineada con la interfaz de Zaldum: claro, navy y oro puntual. */
+body{background:#f8fafc;color:#16222e;}
+#welcome{background:#f8fafc;}
+#welcome::before{border-color:rgba(201,162,39,.12);}
+#welcome::after{border-color:rgba(18,43,80,.06);}
+.welcome-logo,.nav-logo,footer img{filter:none;opacity:1;}
+.welcome-name{color:#122b50;}
+.welcome-tagline{color:#556881;}
+.welcome-btn{background:#122b50;border-color:#122b50;color:#fff;border-radius:8px;}
+.welcome-btn:hover{background:#1e4170;color:#fff;}
+nav{background:rgba(248,250,252,.94);border-bottom:1px solid #dee7f1;box-shadow:0 4px 18px rgba(18,43,80,.05);}
+.nav-links a{color:#334d70;}
+.nav-links a:hover{color:#9b7119;}
+.nav-cta{background:#122b50;border-color:#122b50;color:#fff!important;border-radius:8px;}
+.nav-cta:hover{background:#1e4170;color:#fff!important;}
+#services-screen{background:#f8fafc;color:#122b50;}
+.services-eyebrow,.module-num,.detail-eyebrow,.layer-label,.contact-eyebrow{color:#9b7119;}
+.services-title,.module-name,.detail-title,.contact-title{color:#122b50;}
+.services-title em,.detail-title em,.contact-title em{color:#9b7119;}
+.module{background:#fff;border-color:#dee7f1;box-shadow:0 2px 12px rgba(18,43,80,.035);}
+.module-desc{color:#556881;}
+.module-btn{background:#122b50;color:#fff;border-color:#122b50;border-radius:8px;}
+.module-btn:hover{background:#1e4170;color:#fff;}
+.staircase .module:hover{background:linear-gradient(165deg,#edf3fa,#fff);border-color:#c9a227;}
+.scroll-hint{color:#65778c;}
+.detail-overlay{background:rgba(248,250,252,.98);color:#16222e;}
+.detail-close{border-color:#b5c6d9;background:#fff;color:#122b50;}
+.detail-close:hover{border-color:#c9a227;color:#9b7119;}
+.detail-video-placeholder{background:linear-gradient(135deg,#edf3fa,#f8fafc);border-color:#dee7f1;}
+.video-icon{border-color:rgba(201,162,39,.55);}
+.video-label{color:#556881;}
+.layer-pain{color:#334d70;border-left-color:#c9a227;}
+.layer-h{color:#122b50;}
+.layer-text,.layer-list li{color:#556881;}
+.layer-list li{border-color:#dee7f1;}
+.layer-list li::before{background:#c9a227;}
+.detail-cta{background:#fff;border-color:#dee7f1;}
+.detail-cta-btn{background:#122b50;color:#fff;border-radius:8px;}
+.abakus-redirect a{background:#122b50;border-color:#122b50;color:#fff;border-radius:8px;}
+.abakus-redirect a:hover{background:#1e4170;color:#fff;}
+#contact{background:#edf3fa;border-top-color:#dee7f1;color:#122b50;}
+.contact-sub,.contact-note{color:#556881;}
+.contact-btn{background:#122b50;color:#fff;border-radius:8px;}
+.contact-btn:hover{background:#1e4170;}
+footer{background:#fff;border-top:1px solid #dee7f1;}
+.footer-text{color:#556881;}
+
+
+/* Tipografía única de producto: Nunito Sans, igual que Zaldum. */
+*{font-family:'Nunito Sans',system-ui,sans-serif!important;}
+body{font-weight:400;line-height:1.55;}
+h1,h2,h3,.welcome-name,.services-title,.module-name,.detail-title,.contact-title{
+  font-weight:800;letter-spacing:-.035em;line-height:1.15;
+}
+.welcome-name{font-style:normal;letter-spacing:-.02em;}
+.welcome-tagline,.nav-links a,.welcome-btn,.nav-cta,.services-eyebrow,.module-num,
+.module-btn,.detail-eyebrow,.layer-label,.contact-eyebrow,.footer-text{
+  letter-spacing:.06em;
+}
+.welcome-btn,.nav-cta,.module-btn,.detail-cta-btn,.abakus-redirect a,.contact-btn{
+  font-weight:700;
 }
 </style>
 </head>
