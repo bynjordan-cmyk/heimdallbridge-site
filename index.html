@@ -384,6 +384,15 @@ footer img{height:30px;}
 @media(max-width:900px){#radar-diagnostico{padding:62px 28px}.radar-layout{grid-template-columns:1fr!important}.radar-aside{min-height:0}#radar-diagnostico .radar-quiz{min-height:390px}}
 @media(max-width:620px){#radar-diagnostico{padding:46px 16px 54px}.radar-hero{margin-bottom:24px!important}#radar-diagnostico .radar-hero h2{font-size:36px}.radar-hero p{font-size:14px!important}.radar-quiz{padding:22px 18px!important;min-height:440px!important}.radar-aside{padding:22px!important}.radar-result{padding:22px 18px!important}.radar-findings{grid-template-columns:1fr!important}.radar-resulttop{align-items:flex-start}.radar-score{width:72px!important;height:72px!important}.radar-score b{font-size:17px!important}}
 
+/* Pulso suave para destacar el acceso al autodiagnóstico sin destellos bruscos. */
+@keyframes diagnostic-cta-pulse{
+  0%,100%{box-shadow:0 0 0 0 rgba(201,162,39,0);opacity:1}
+  50%{box-shadow:0 0 0 5px rgba(201,162,39,.24);opacity:.9}
+}
+.nav-cta{animation:diagnostic-cta-pulse 1.8s ease-in-out infinite}
+.nav-cta:hover,.nav-cta:focus-visible{animation-play-state:paused}
+@media(prefers-reduced-motion:reduce){.nav-cta{animation:none}}
+
 </style>
 </head>
 <body>
