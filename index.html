@@ -386,10 +386,10 @@ footer img{height:30px;}
 
 /* Pulso suave para destacar el acceso al autodiagnóstico sin destellos bruscos. */
 @keyframes diagnostic-cta-pulse{
-  0%,100%{box-shadow:0 0 0 0 rgba(201,162,39,0);opacity:1}
-  50%{box-shadow:0 0 0 5px rgba(201,162,39,.24);opacity:.9}
+  0%,100%{box-shadow:0 0 0 0 rgba(201,162,39,.6),0 0 8px rgba(201,162,39,.22);filter:brightness(1);transform:scale(1)}
+  50%{box-shadow:0 0 0 9px rgba(201,162,39,.42),0 0 20px rgba(201,162,39,.35);filter:brightness(1.16);transform:scale(1.04)}
 }
-.nav-cta{animation:diagnostic-cta-pulse 1.8s ease-in-out infinite}
+.nav-cta{animation:diagnostic-cta-pulse 1.4s ease-in-out infinite}
 .nav-cta:hover,.nav-cta:focus-visible{animation-play-state:paused}
 @media(prefers-reduced-motion:reduce){.nav-cta{animation:none}}
 
