@@ -316,6 +316,74 @@ h1,h2,h3,.welcome-name,.services-title,.module-name,.detail-title,.contact-title
 .nav-logo{height:36px;}
 footer img{height:30px;}
 .welcome-name{margin-top:12px;}
+
+/* Autodiagnóstico interactivo, integrado antes de la franja de servicios. */
+#radar-diagnostico{scroll-margin-top:76px;background:#f8fafc;color:#16222e;padding:76px 56px 82px;min-height:calc(100vh - 72px);border-bottom:1px solid #dee7f1}
+#radar-diagnostico *{box-sizing:border-box}
+#radar-diagnostico .radar-wrap{max-width:1160px;margin:0 auto}
+#radar-diagnostico .radar-hero{text-align:center;margin:0 auto 32px}
+#radar-diagnostico .radar-eyebrow{display:inline-flex;align-items:center;gap:9px;color:#9b7119;font:900 11px 'Nunito Sans',sans-serif;letter-spacing:.14em;text-transform:uppercase}
+#radar-diagnostico .radar-eyebrow:before{content:"";width:7px;height:7px;border-radius:50%;background:#c9a227}
+#radar-diagnostico .radar-hero h2{max-width:760px;margin:13px auto 12px;color:#122b50;font:900 clamp(34px,4.4vw,54px)/1.06 'Nunito Sans',sans-serif;letter-spacing:-.05em}
+#radar-diagnostico .radar-hero p{max-width:660px;margin:0 auto;color:#62748a;font-size:16px;line-height:1.65}
+#radar-diagnostico .radar-hero strong{color:#122b50}
+#radar-diagnostico .radar-layout{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(280px,.75fr);gap:20px;align-items:stretch}
+#radar-diagnostico .radar-card{border:1px solid #dee7f1;border-radius:16px;background:#fff;box-shadow:0 14px 38px rgba(18,43,80,.06)}
+#radar-diagnostico .radar-quiz{padding:27px 30px;min-height:406px;display:flex;flex-direction:column}
+#radar-diagnostico .radar-quizhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;gap:12px}
+#radar-diagnostico .radar-tag{font-size:10px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#122b50;background:#edf3fa;border-radius:30px;padding:8px 12px}
+#radar-diagnostico .radar-stepnum{font-size:12px;color:#62748a;font-weight:800;white-space:nowrap}
+#radar-diagnostico .radar-track{height:5px;border-radius:8px;background:#e9eef4;overflow:hidden;margin-bottom:25px}
+#radar-diagnostico .radar-fill{height:100%;width:16.66%;background:#c9a227;border-radius:8px;transition:width .3s}
+#radar-diagnostico .radar-question{flex:1}
+#radar-diagnostico .radar-qtitle{font-size:22px;letter-spacing:-.03em;line-height:1.22;color:#122b50;margin:0 0 7px;font-weight:900}
+#radar-diagnostico .radar-qhint{font-size:13px;color:#62748a;margin:0 0 17px}
+#radar-diagnostico .radar-answers{display:grid;gap:8px}
+#radar-diagnostico .radar-choice{width:100%;border:1px solid #dee7f1;border-radius:10px;padding:11px 13px;display:flex;align-items:center;gap:11px;cursor:pointer;color:#334d70;transition:.18s;background:#fff;text-align:left}
+#radar-diagnostico .radar-choice:hover{border-color:#9bb0c8;background:#fbfdff}
+#radar-diagnostico .radar-choice.selected{border-color:#122b50;background:#f4f7fb;box-shadow:0 0 0 2px rgba(18,43,80,.07)}
+#radar-diagnostico .radar-radio{width:16px;height:16px;border-radius:50%;border:1.5px solid #9caec1;flex:none;display:grid;place-items:center}
+#radar-diagnostico .radar-choice.selected .radar-radio{border-color:#122b50}
+#radar-diagnostico .radar-choice.selected .radar-radio:after{content:"";width:7px;height:7px;border-radius:50%;background:#122b50}
+#radar-diagnostico .radar-choice span:last-child{font-size:13px;font-weight:700}
+#radar-diagnostico .radar-quizfoot{display:flex;justify-content:space-between;align-items:center;margin-top:auto;padding-top:16px;gap:12px}
+#radar-diagnostico .radar-textbtn{border:0;background:transparent;color:#62748a;font-size:12px;font-weight:800;cursor:pointer;padding:9px 0}
+#radar-diagnostico .radar-primary{border:0;background:#122b50;color:#fff;border-radius:9px;padding:11px 17px;font-size:13px;font-weight:900;cursor:pointer;transition:.2s;box-shadow:0 5px 13px rgba(18,43,80,.13);text-decoration:none;display:inline-flex;align-items:center;justify-content:center}
+#radar-diagnostico .radar-primary:hover{background:#1e4170;transform:translateY(-1px)}
+#radar-diagnostico .radar-primary:disabled{opacity:.4;cursor:not-allowed;transform:none}
+#radar-diagnostico .radar-aside{padding:26px;background:#122b50;color:#fff;position:relative;overflow:hidden}
+#radar-diagnostico .radar-aside:before{content:"";position:absolute;width:240px;height:240px;border:1px solid rgba(201,162,39,.22);border-radius:50%;right:-100px;top:-110px;box-shadow:0 0 0 28px rgba(201,162,39,.035),0 0 0 58px rgba(201,162,39,.025)}
+#radar-diagnostico .radar-aside-inner{position:relative;z-index:1}
+#radar-diagnostico .radar-aside .radar-eyebrow{color:#e2c45f}
+#radar-diagnostico .radar-aside h3{font-size:24px;line-height:1.12;letter-spacing:-.035em;margin:13px 0 9px;color:#fff;font-weight:900}
+#radar-diagnostico .radar-aside p{color:#c6d3e2;font-size:13px;line-height:1.55;margin:0}
+#radar-diagnostico .radar-signals{list-style:none;padding:14px 0 0;margin:15px 0 0}
+#radar-diagnostico .radar-signals li{border-top:1px solid rgba(255,255,255,.14);padding:12px 0;display:flex;align-items:flex-start;gap:10px;color:#f2f6fa;font-size:13px;font-weight:700;line-height:1.4}
+#radar-diagnostico .radar-signal{width:25px;height:25px;display:grid;place-items:center;flex:none;border-radius:7px;background:rgba(201,162,39,.15);color:#e2c45f;font-weight:900}
+#radar-diagnostico .radar-note{margin-top:14px;color:#708198;font-size:11px;line-height:1.55;text-align:center}
+#radar-diagnostico .radar-result{display:none;padding:27px;min-height:406px}
+#radar-diagnostico .radar-result.show{display:flex;flex-direction:column}
+#radar-diagnostico .radar-quiz.hide{display:none}
+#radar-diagnostico .radar-resulttop{display:flex;align-items:center;gap:18px}
+#radar-diagnostico .radar-score{width:82px;height:82px;border-radius:50%;display:grid;place-items:center;background:conic-gradient(#c9a227 var(--score),#e9eef4 0);position:relative;flex:none}
+#radar-diagnostico .radar-score:before{content:"";position:absolute;inset:7px;background:#fff;border-radius:50%}
+#radar-diagnostico .radar-score b{position:relative;color:#122b50;font-size:20px}
+#radar-diagnostico .radar-result h3{color:#122b50;font-size:24px;line-height:1.1;letter-spacing:-.04em;margin:0 0 7px}
+#radar-diagnostico .radar-result p{color:#62748a;font-size:13px;line-height:1.55;margin:0}
+#radar-diagnostico .radar-findings{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:20px 0}
+#radar-diagnostico .radar-finding{background:#f5f8fb;border:1px solid #dee7f1;border-radius:10px;padding:11px}
+#radar-diagnostico .radar-finding small{color:#62748a;font-weight:900;text-transform:uppercase;letter-spacing:.07em;font-size:9px}
+#radar-diagnostico .radar-finding b{display:block;color:#122b50;font-size:12px;margin-top:5px}
+#radar-diagnostico .radar-rescta{margin-top:auto;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+#radar-diagnostico .radar-restart{border:0;background:transparent;color:#62748a;font-size:11px;font-weight:800;cursor:pointer}
+#radar-diagnostico .radar-fine{font-size:10px!important;margin-top:12px!important}
+#radar-diagnostico .radar-services-link{font-size:11px;color:#122b50;text-decoration:underline;text-underline-offset:3px;font-weight:800}
+#radar-diagnostico .radar-choice:focus-visible,#radar-diagnostico button:focus-visible,#radar-diagnostico a:focus-visible{outline:3px solid #c9a227;outline-offset:2px}
+#services-screen{scroll-margin-top:72px}
+#contact{scroll-margin-top:72px}
+@media(max-width:900px){#radar-diagnostico{padding:62px 28px}.radar-layout{grid-template-columns:1fr!important}.radar-aside{min-height:0}#radar-diagnostico .radar-quiz{min-height:390px}}
+@media(max-width:620px){#radar-diagnostico{padding:46px 16px 54px}.radar-hero{margin-bottom:24px!important}#radar-diagnostico .radar-hero h2{font-size:36px}.radar-hero p{font-size:14px!important}.radar-quiz{padding:22px 18px!important;min-height:440px!important}.radar-aside{padding:22px!important}.radar-result{padding:22px 18px!important}.radar-findings{grid-template-columns:1fr!important}.radar-resulttop{align-items:flex-start}.radar-score{width:72px!important;height:72px!important}.radar-score b{font-size:17px!important}}
+
 </style>
 </head>
 <body>
@@ -334,9 +402,46 @@ footer img{height:30px;}
   <div class="nav-links">
     <a href="#services-screen">Servicios</a>
     <a href="#contact">Contacto</a>
-    <a href="#contact" class="nav-cta">Diagnóstico gratuito</a>
+    <a href="#radar-diagnostico" class="nav-cta">Autodiagnóstico</a>
   </div>
 </nav>
+
+<!-- AUTODIAGNÓSTICO -->
+<section id="radar-diagnostico" aria-labelledby="radar-title">
+  <div class="radar-wrap">
+    <div class="radar-hero">
+      <div class="radar-eyebrow">Radar Express · Compras y pagos</div>
+      <h2 id="radar-title">¿Qué tan visible es el gasto de tu empresa?</h2>
+      <p>Responde <strong>6 preguntas rápidas</strong> para obtener una orientación inicial sobre posibles puntos ciegos en tu ciclo de compras y pagos.</p>
+    </div>
+    <div class="radar-layout">
+      <div class="radar-card">
+        <div class="radar-quiz" id="radar-quiz">
+          <div class="radar-quizhead"><span class="radar-tag">Autodiagnóstico gratuito</span><span class="radar-stepnum" id="radar-stepnum">01 / 06</span></div>
+          <div class="radar-track"><div class="radar-fill" id="radar-fill"></div></div>
+          <div class="radar-question" id="radar-question" aria-live="polite"></div>
+          <div class="radar-quizfoot"><button class="radar-textbtn" id="radar-back" type="button" style="visibility:hidden">← Anterior</button><button class="radar-primary" id="radar-next" type="button" disabled>Siguiente →</button></div>
+        </div>
+        <div class="radar-result" id="radar-result" aria-live="polite"></div>
+      </div>
+      <aside class="radar-card radar-aside">
+        <div class="radar-aside-inner">
+          <div class="radar-eyebrow">Qué puede revelar</div>
+          <h3>Señales que suelen pasar desapercibidas.</h3>
+          <p>El resultado te ayuda a identificar temas que vale la pena revisar con más detalle.</p>
+          <ul class="radar-signals">
+            <li><span class="radar-signal">01</span><span>Facturas que no coinciden con una recepción</span></li>
+            <li><span class="radar-signal">02</span><span>Pagos duplicados o sin respaldo claro</span></li>
+            <li><span class="radar-signal">03</span><span>Vencimientos que se detectan demasiado tarde</span></li>
+          </ul>
+          <div class="radar-footnote">Esta herramienta es orientativa; no sustituye una auditoría ni confirma hallazgos.</div>
+        </div>
+      </aside>
+    </div>
+    <p class="radar-note">Sin costo · Toma cerca de 2 minutos · No necesitas subir documentos</p>
+  </div>
+</section>
+
 
 <!-- PANTALLA 2 — SERVICIOS -->
 <section id="services-screen">
@@ -512,6 +617,41 @@ function closeDetail(){
   document.getElementById('detailOverlay').classList.remove('open');
 }
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeDetail();});
+
+/* Autodiagnóstico Radar Express: respuestas procesadas solo en el navegador. */
+(function(){
+ const questions=[
+  {q:"¿Cómo verifican que una factura corresponda a lo que realmente se recibió?",hint:"Piensa en el proceso habitual de tu empresa.",a:["Se cruza con la orden y la recepción antes de pagar","Se valida de forma manual, según el área","No siempre tenemos esa información a mano"]},
+  {q:"¿Qué tan fácil es saber cuánto debe hoy la empresa y qué vence próximamente?",hint:"Considera si la respuesta sale de un solo lugar.",a:["Tenemos un reporte actualizado y centralizado","Se puede saber, pero hay que consolidar información","Normalmente lo descubrimos cuando se acerca el pago"]},
+  {q:"¿Las compras requieren aprobación antes de emitir una orden?",hint:"Incluye compras urgentes o realizadas por distintas áreas.",a:["Sí, con responsables y límites definidos","Depende del monto o de quién solicita","No hay un flujo consistente"]},
+  {q:"¿Cómo detectan facturas duplicadas o pagos sin respaldo?",hint:"Considera controles preventivos y revisiones posteriores.",a:["Hay controles definidos y revisiones periódicas","Se revisa cuando alguien nota algo extraño","No contamos con una revisión sistemática"]},
+  {q:"¿Pueden relacionar una compra con su factura y comprobante de pago?",hint:"Piensa en el ciclo completo, desde la solicitud hasta el pago.",a:["Sí, queda trazabilidad en un mismo proceso","La información existe, pero en varios archivos o sistemas","Es difícil reconstruir el historial"]},
+  {q:"¿Con qué frecuencia revisan el gasto y las excepciones del proceso?",hint:"Por ejemplo: pagos fuera de proceso, diferencias o urgencias.",a:["Mensualmente o con mayor frecuencia","Solo cuando surge una necesidad","No tenemos una rutina establecida"]}
+ ];
+ let current=0,answers=Array(questions.length).fill(null);
+ const el=id=>document.getElementById(id);
+ function draw(){
+  const q=questions[current];el("radar-stepnum").textContent=String(current+1).padStart(2,"0")+" / 06";
+  el("radar-fill").style.width=((current+1)/6*100)+"%";
+  el("radar-question").innerHTML='<h3 class="radar-qtitle">'+q.q+'</h3><p class="radar-qhint">'+q.hint+'</p><div class="radar-answers" role="group" aria-label="Opciones de respuesta">'+q.a.map((t,j)=>'<button type="button" class="radar-choice '+(answers[current]===j?"selected":"")+'" aria-pressed="'+(answers[current]===j)+'" data-answer="'+j+'"><span class="radar-radio"></span><span>'+t+'</span></button>').join("")+'</div>';
+  el("radar-question").querySelectorAll("[data-answer]").forEach(btn=>btn.addEventListener("click",()=>{answers[current]=Number(btn.dataset.answer);draw()}));
+  el("radar-back").style.visibility=current===0?"hidden":"visible";el("radar-next").disabled=answers[current]===null;el("radar-next").textContent=current===5?"Ver mi orientación →":"Siguiente →";
+ }
+ function move(n){if(n===1&&answers[current]===null)return;current+=n;if(current<0)current=0;if(current<questions.length){draw();return}showResult()}
+ function showResult(){
+  const score=answers.reduce((sum,a)=>sum+a,0);
+  const level=score<=3?"Buenas bases":score<=8?"Algunos puntos ciegos":"Conviene revisar el proceso";
+  const desc=score<=3?"Tus respuestas sugieren que ya existen controles útiles. Una revisión puede ayudar a comprobar su consistencia y encontrar oportunidades de mejora.":score<=8?"Tus respuestas sugieren que algunos controles dependen de procesos manuales o información dispersa. Puede ser útil revisar dónde se rompe la trazabilidad.":"Tus respuestas sugieren que puede haber poca visibilidad en partes importantes del ciclo de compras y pagos. Conviene priorizar una revisión ordenada.";
+  const focus=score>7?"Trazabilidad de factura a pago":"Consistencia de los controles";
+  const pct=Math.round(score/12*100);
+  el("radar-quiz").classList.add("hide");const r=el("radar-result");r.classList.add("show");
+  r.innerHTML='<div class="radar-resulttop"><div class="radar-score" style="--score:'+pct+'%"><b>'+score+'/12</b></div><div><div class="radar-eyebrow">Tu orientación inicial</div><h3>'+level+'</h3><p>'+desc+'</p></div></div><div class="radar-findings"><div class="radar-finding"><small>Foco sugerido</small><b>'+focus+'</b></div><div class="radar-finding"><small>Siguiente paso</small><b>Revisar una muestra del proceso</b></div></div><div class="radar-rescta"><a class="radar-primary" href="mailto:contacto@heimdallbridge.com?subject=Quiero%20conversar%20sobre%20mi%20autodiagn%C3%B3stico">Conversar sobre el resultado →</a><a class="radar-services-link" href="#services-screen">Explorar los servicios HBC ↓</a><button class="radar-restart" id="radar-restart" type="button">Volver a empezar</button></div><p class="radar-fine">Orientación basada solo en tus respuestas; no confirma errores ni sustituye un diagnóstico profesional. Tus respuestas no se envían ni se almacenan.</p>';
+  el("radar-restart").addEventListener("click",reset);
+ }
+ function reset(){current=0;answers=Array(questions.length).fill(null);el("radar-result").classList.remove("show");el("radar-result").innerHTML="";el("radar-quiz").classList.remove("hide");draw();el("radar-diagnostico").scrollIntoView({behavior:"smooth",block:"start"})}
+ el("radar-back").addEventListener("click",()=>move(-1));el("radar-next").addEventListener("click",()=>move(1));draw();
+})();
+
 </script>
 </body>
 </html>
