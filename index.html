@@ -630,6 +630,16 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeDetail();});
  ];
  let current=0,answers=Array(questions.length).fill(null);
  const el=id=>document.getElementById(id);
+ const completedKey="hbc-radar-diagnostico-completado-v1";
+ try{if(localStorage.getItem(completedKey)==="1")el("radar-diagnostico").hidden=true}catch{}
+ const diagnosticLink=document.querySelector('.nav-cta[href="#radar-diagnostico"]');
+ diagnosticLink?.addEventListener("click",event=>{
+  if(el("radar-diagnostico").hidden){
+   event.preventDefault();el("radar-diagnostico").hidden=false;
+   try{localStorage.removeItem(completedKey)}catch{}
+   reset();
+  }
+ });
  function draw(){
   const q=questions[current];el("radar-stepnum").textContent=String(current+1).padStart(2,"0")+" / 06";
   el("radar-fill").style.width=((current+1)/6*100)+"%";
@@ -647,6 +657,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeDetail();});
   el("radar-quiz").classList.add("hide");const r=el("radar-result");r.classList.add("show");
   r.innerHTML='<div class="radar-resulttop"><div class="radar-score" style="--score:'+pct+'%"><b>'+score+'/12</b></div><div><div class="radar-eyebrow">Tu orientación inicial</div><h3>'+level+'</h3><p>'+desc+'</p></div></div><div class="radar-findings"><div class="radar-finding"><small>Foco sugerido</small><b>'+focus+'</b></div><div class="radar-finding"><small>Siguiente paso</small><b>Revisar una muestra del proceso</b></div></div><div class="radar-rescta"><a class="radar-primary" href="mailto:contacto@heimdallbridge.com?subject=Quiero%20conversar%20sobre%20mi%20autodiagn%C3%B3stico">Conversar sobre el resultado →</a><a class="radar-services-link" href="#services-screen">Explorar los servicios HBC ↓</a><button class="radar-restart" id="radar-restart" type="button">Volver a empezar</button></div><p class="radar-fine">Orientación basada solo en tus respuestas; no confirma errores ni sustituye un diagnóstico profesional. Tus respuestas no se envían ni se almacenan.</p>';
   el("radar-restart").addEventListener("click",reset);
+  try{localStorage.setItem(completedKey,"1")}catch{}
  }
  function reset(){current=0;answers=Array(questions.length).fill(null);el("radar-result").classList.remove("show");el("radar-result").innerHTML="";el("radar-quiz").classList.remove("hide");draw();el("radar-diagnostico").scrollIntoView({behavior:"smooth",block:"start"})}
  el("radar-back").addEventListener("click",()=>move(-1));el("radar-next").addEventListener("click",()=>move(1));draw();
